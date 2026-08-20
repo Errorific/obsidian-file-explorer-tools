@@ -15,6 +15,15 @@ File Explorer Tools extends Obsidian's built-in file explorer with:
 
 The first release targets desktop Obsidian. Mobile support is required for the following release, so the design must not depend on keyboard modifiers, hover, or desktop-only APIs.
 
+## Plugin identity
+
+- Display name: `File Explorer Tools`
+- Manifest ID: `file-explorer-tools`
+- Command ID prefix: `file-explorer-tools:`
+- Initial settings schema version: `1`
+
+The manifest ID is stable after release. Local development plugin directories, including the test-vault symbolic link, must use the manifest ID.
+
 ## Technical constraints
 
 Obsidian does not expose public APIs for:
@@ -37,6 +46,17 @@ The compatibility layer must:
 - Restore all patches on unload
 - Report compatibility failures clearly
 
+### Failure behavior
+
+Integration with undocumented explorer APIs must fail open:
+
+- Never prevent the core file explorer from loading.
+- Never leave the explorer partially patched after an initialization error.
+- Retain Obsidian's native order when sorting integration is unavailable.
+- Show items rather than risk making them inaccessible when hiding integration is unavailable.
+- Disable only the unsupported feature and provide a concise notice or diagnostic message.
+- Restore original explorer behavior on unload, including after partial initialization.
+
 ## Product requirements
 
 ### Hidden items
@@ -55,7 +75,7 @@ Reveal-hidden state resets when Obsidian restarts and is independent for each fi
 
 Hiding an ordered-prefix item retains its stored position. A hidden folder and its descendants retain independent hidden states.
 
-Locating a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when focus changes or the session ends.
+Locating a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes, reveal-hidden mode changes for that explorer leaf, or the plugin unloads. Moving focus to another pane without changing the active file does not conceal the located path.
 
 ### Sorting
 
@@ -69,7 +89,7 @@ The initial normal sort modes are:
 
 The existing core explorer sort menu selects the global sort mode.
 
-Files and folders can be globally configured as either mixed or folders first. In time-based modes, folders are grouped first and sorted by name because Obsidian does not expose reliable folder timestamps.
+Files and folders can be globally configured as either mixed or folders first. In time-based modes, folders are grouped first and always sorted by name ascending because Obsidian does not expose reliable folder timestamps.
 
 A folder context menu can select a per-folder sort override or return the folder to **Use global**. Overrides are available for every folder, including the vault root.
 
@@ -156,6 +176,14 @@ The file explorer toolbar contains three plugin controls:
 3. Force global sorting
 
 Commands remain available separately, including an explicit collapse command.
+
+### Accessibility
+
+- Reorder handles must be keyboard-focusable and expose accessible labels identifying their items.
+- Context menus must provide move-up and move-down actions as non-drag alternatives for ordered-prefix items.
+- Toolbar toggles must expose pressed state and meaningful tooltips.
+- Hidden state must not be conveyed through opacity alone.
+- Reordering and locating items must preserve useful keyboard focus.
 
 ## Architecture
 
@@ -282,6 +310,7 @@ Paths are vault-relative and migrated during rename events.
 
 ```ts
 interface FileExplorerToolsSettings {
+	schemaVersion: 1;
 	groupFoldersFirst: boolean;
 	hiddenPaths: string[];
 	folders: Record<string, FolderConfiguration>;
@@ -294,6 +323,16 @@ interface FolderConfiguration {
 ```
 
 `orderedPrefix` stores child names under the parent folder rather than absolute paths. Vault siblings cannot share a name, and parent-folder renames therefore do not require rewriting prefix entries.
+
+Obsidian's core explorer remains the source of truth for the global sort mode. The plugin persists only its folder-grouping preference, hidden paths, ordered prefixes, and per-folder overrides.
+
+Settings are validated and normalized after `loadData()`:
+
+- Migrations run according to `schemaVersion` and are tested independently.
+- Unknown fields are safely ignored or preserved when needed for forward compatibility.
+- Invalid paths and prefix entries are removed during reconciliation with the vault.
+- Duplicate prefix entries are deduplicated while preserving their first occurrence.
+- Malformed values fall back to defaults without preventing plugin load.
 
 ### Vault event handling
 
@@ -409,6 +448,19 @@ Pure functionality should be tested without an Obsidian runtime wherever possibl
 Explorer adapter tests should use narrow fakes matching the undocumented structures the adapter expects. Manual tests in the linked vault are still required for DOM behavior, toolbar placement, explorer rerenders, native drag and drop, and compatibility with Folder Notes.
 
 Test output must be clean. Expected errors from compatibility tests must be captured and asserted.
+
+## Phase completion criteria
+
+Every implementation phase must meet these criteria before it is considered complete:
+
+- Build, lint, and tests pass with clean output.
+- New pure behavior has comprehensive unit tests.
+- Undocumented explorer API assumptions remain confined to the adapter.
+- No generated artifacts are committed.
+- Plugin unload leaves no listeners, observers, DOM elements, or patches behind.
+- Relevant behavior is manually verified in the linked test vault.
+- This document is updated if implementation discoveries change an agreed contract.
+- The phase ends in a reviewable commit or pull request.
 
 ## Risks and mitigations
 
