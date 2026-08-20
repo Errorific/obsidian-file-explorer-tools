@@ -357,6 +357,8 @@ On create:
 
 ### Phase 1: Project foundation
 
+Status: Implemented in PR #5.
+
 - Rename template metadata and classes
 - Add Vitest using the daily-note-navigator tooling pattern
 - Split sample code into focused modules
