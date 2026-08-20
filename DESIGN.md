@@ -367,6 +367,8 @@ Status: Implemented in PR #5.
 
 ### Phase 2: Explorer compatibility probe
 
+Status: Implemented and manually verified against Obsidian 1.13.7.
+
 Before building features, create a minimal adapter and verify it against the test vault:
 
 - Attach actions to the explorer toolbar
@@ -377,6 +379,8 @@ Before building features, create a minimal adapter and verify it against the tes
 - Expand, collapse, select, and scroll to a path
 
 This phase must fail clearly if the installed Obsidian version has incompatible internals.
+
+The Obsidian 1.13.7 probe found that the file explorer extends `View` rather than `ItemView`, so it does not expose `addAction()`. Toolbar actions use the explorer's guarded `headerDom.addNavButton()` capability. The remaining verified internals are confined to the adapter: `fileItems`, `sortOrder`, `sort()`, folder-item `setCollapsed()`, and the tree selection and virtual-scroll methods.
 
 ### Phase 3: Sorting engine
 
