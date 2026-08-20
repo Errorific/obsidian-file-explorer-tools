@@ -1,14 +1,19 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "file-explorer-tools",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Tools for hiding, sorting, and navigating items in Obsidian's file explorer.",
 	"main": "main.js",
 	"type": "module",
+	"engines": {
+		"node": ">=20.19"
+	},
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"keywords": [],
 	"license": "0-BSD",
@@ -22,6 +27,7 @@
 		"jiti": "^2.6.1",
 		"obsidian": "latest",
 		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.59.1"
+		"typescript-eslint": "^8.59.1",
+		"vitest": "^4.1.11"
 	}
 }
