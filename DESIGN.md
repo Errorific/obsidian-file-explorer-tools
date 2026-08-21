@@ -367,6 +367,8 @@ Status: Implemented in PR #5.
 
 ### Phase 2: Explorer compatibility probe
 
+Status: Implemented and manually verified against Obsidian 1.13.7.
+
 Before building features, create a minimal adapter and verify it against the test vault:
 
 - Attach actions to the explorer toolbar
@@ -377,6 +379,22 @@ Before building features, create a minimal adapter and verify it against the tes
 - Expand, collapse, select, and scroll to a path
 
 This phase must fail clearly if the installed Obsidian version has incompatible internals.
+
+The Obsidian 1.13.7 probe found that the file explorer extends `View` rather than `ItemView`, so it does not expose `addAction()`. Toolbar actions use the explorer's guarded `headerDom.addNavButton()` capability.
+
+#### Verified Obsidian 1.13.7 internals
+
+The compatibility probe established the following implementation details. They remain undocumented assumptions and must be accessed only through the explorer adapter:
+
+- Explorer items are stored in `view.fileItems`, keyed by vault-relative path.
+- The current core sort mode is stored in `view.sortOrder` using `alphabetical`, `alphabeticalReverse`, `byModifiedTime`, `byModifiedTimeReverse`, `byCreatedTime`, or `byCreatedTimeReverse`.
+- `view.sort()` performs the native sorting operation.
+- `view.getSortedFolderItems(folder)` orders underlying explorer children rather than only rearranging rendered DOM elements.
+- Folder items expose their state through `collapsed` and change it through `setCollapsed(collapsed, persist)`.
+- Selection uses `tree.clearSelectedDoms()`, `tree.selectItem(item)`, and `tree.setFocusedItem(item, scroll)`.
+- Virtualized scrolling uses `tree.infinityScroll.scrollIntoView(item, padding)`.
+- Explorer content renders beneath `view.navFileContainerEl`, whose subtree mutations reveal rerenders.
+- Explorer toolbar controls are registered through `view.headerDom.addNavButton()`.
 
 ### Phase 3: Sorting engine
 
