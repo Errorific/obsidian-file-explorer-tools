@@ -14,7 +14,6 @@ If your plugin does not need CSS, delete this file.
 	opacity: 0.55;
 }
 
-.file-explorer-tools-hidden-revealed::after {
-	content: ' (hidden)';
-	color: var(--text-muted);
+.file-explorer-tools-hidden-revealed {
+	border-left: 2px solid var(--text-muted);
 }

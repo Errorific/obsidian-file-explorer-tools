@@ -1,4 +1,4 @@
-import type { EventRef } from 'obsidian';
+import type { EventRef, TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, type FileExplorerToolsSettings } from '../settings';
 import { isHidden, pathsToReveal } from '../hiding/hidden-items';
 import { createLeafState, resetTemporaryVisibility, type ExplorerLeafState } from './leaf-state';
@@ -19,8 +19,11 @@ export interface ExplorerPluginHost {
 	app: {
 		workspace: {
 			getLeavesOfType(viewType: string): ExplorerLeaf[];
-			on(name: 'layout-change', callback: () => void): EventRef;
-			on(name: 'file-open', callback: () => void): EventRef;
+			getActiveFile(): TFile | null;
+			on(
+				name: 'layout-change' | 'file-open',
+				callback: (file?: TFile | null) => void,
+			): EventRef;
 			onLayoutReady(callback: () => void): void;
 		};
 	};
@@ -75,9 +78,14 @@ export class ExplorerController {
 				}),
 			);
 			this.plugin.registerEvent(
-				this.plugin.app.workspace.on('file-open', () => {
+				this.plugin.app.workspace.on('file-open', (file) => {
 					for (const attached of this.attachedLeaves.values()) {
 						resetTemporaryVisibility(attached.state);
+						if (file != null) {
+							for (const path of pathsToReveal(file.path, this.getSettings())) {
+								attached.state.temporaryVisiblePaths.add(path);
+							}
+						}
 						this.applyVisibility(attached);
 					}
 				}),
@@ -213,6 +221,12 @@ export class ExplorerController {
 			}
 
 			adapter.runOriginalSort();
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (activeFile !== null) {
+				for (const path of pathsToReveal(activeFile.path, this.getSettings())) {
+					attached.state.temporaryVisiblePaths.add(path);
+				}
+			}
 			this.applyVisibility(attached);
 			const report = adapter.getCompatibilityReport();
 			if (!report.available) {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { TFile } from 'obsidian';
 import type { FileExplorerToolsSettings } from '../settings';
 import type { ExplorerAdapter, ToolbarAction } from './adapter-types';
 import {
@@ -87,7 +88,11 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 		app: {
 			workspace: {
 				getLeavesOfType,
-				on: (name: 'layout-change' | 'file-open', callback: () => void) =>
+				getActiveFile: () => null,
+				on: (
+					name: 'layout-change' | 'file-open',
+					callback: (file?: TFile | null) => void,
+				) =>
 					name === 'layout-change'
 						? onLayoutChange(name, callback)
 						: onFileOpen(name, callback),
