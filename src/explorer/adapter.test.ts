@@ -20,7 +20,11 @@ function createView() {
 		}),
 	};
 	const selected = new Set<FakeItem>();
-	const toolbarElement = { remove: vi.fn(), setAttribute: vi.fn() };
+	const toolbarElement = {
+		classList: { add: vi.fn() },
+		remove: vi.fn(),
+		setAttribute: vi.fn(),
+	};
 	let toolbarCallback: ((event: MouseEvent) => unknown) | null = null;
 	const view = {
 		addAction: vi.fn(
@@ -321,9 +325,13 @@ describe('createExplorerAdapter', () => {
 			callback: () => {
 				pressed = !pressed;
 			},
+			cssClass: 'file-explorer-tools-force-global',
 			getPressed: () => pressed,
 		});
 
+		expect(toolbarElement.classList.add).toHaveBeenCalledWith(
+			'file-explorer-tools-force-global',
+		);
 		expect(toolbarElement.setAttribute).toHaveBeenCalledWith(
 			'aria-pressed',
 			'false',

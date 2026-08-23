@@ -1,8 +1,8 @@
-/*
+.file-explorer-tools-force-global[aria-pressed='true'] {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
-*/
+.file-explorer-tools-force-global[aria-pressed='true']:hover {
+	background-color: var(--interactive-accent-hover);
+}

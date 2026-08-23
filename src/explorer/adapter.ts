@@ -117,6 +117,7 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 				return null;
 			}
 			const removableElement = element;
+			addCssClass(removableElement, action.cssClass);
 			const update = () =>
 				updatePressedState(removableElement, action.getPressed);
 			update();
@@ -544,6 +545,19 @@ function readParentPath(value: unknown): string | null {
 	return isRecord(value) && isRecord(value.parent)
 		? readPath(value.parent)
 		: null;
+}
+
+function addCssClass(element: unknown, cssClass: string | undefined): void {
+	if (
+		cssClass === undefined ||
+		!isRecord(element) ||
+		!isRecord(element.classList) ||
+		typeof element.classList.add !== 'function'
+	) {
+		return;
+	}
+
+	Reflect.apply(element.classList.add, element.classList, [cssClass]);
 }
 
 function updatePressedState(
