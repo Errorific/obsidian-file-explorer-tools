@@ -11,19 +11,20 @@ If your plugin does not need CSS, delete this file.
 }
 
 .file-explorer-tools-hidden-revealed {
+	--nav-item-color: var(--text-muted);
+	--nav-item-color-hover: var(--text-muted);
 	border-left: 2px solid var(--text-muted);
-	color: var(--text-muted);
+	color: var(--text-muted) !important;
 }
 
-.file-explorer-tools-hidden-revealed .nav-file-title,
-.file-explorer-tools-hidden-revealed .nav-folder-title,
+.file-explorer-tools-hidden-revealed > .nav-file-title,
+.file-explorer-tools-hidden-revealed > .nav-folder-title,
+.file-explorer-tools-hidden-revealed > .nav-file-title-content,
+.file-explorer-tools-hidden-revealed > .nav-folder-title-content,
 .file-explorer-tools-hidden-revealed .nav-file-title-content,
-.file-explorer-tools-hidden-revealed .nav-folder-title-content {
-	color: var(--text-muted);
-}
-
+.file-explorer-tools-hidden-revealed .nav-folder-title-content,
 .file-explorer-tools-hidden-revealed .nav-file-tag,
 .file-explorer-tools-hidden-revealed .nav-file-icon,
 .file-explorer-tools-hidden-revealed .nav-folder-collapse-indicator {
-	color: var(--text-muted);
+	color: var(--text-muted) !important;
 }
