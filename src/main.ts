@@ -16,7 +16,11 @@ export default class FileExplorerToolsPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		this.unloaded = false;
-		const prepared = prepareSettings(await this.loadData());
+		const data: unknown = await this.loadData();
+		if (this.unloaded) {
+			return;
+		}
+		const prepared = prepareSettings(data);
 		this.settings = prepared.settings;
 		if (prepared.needsSave) {
 			await this.saveSettings();
