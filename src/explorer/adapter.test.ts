@@ -333,6 +333,23 @@ describe('createExplorerAdapter', () => {
 		);
 	});
 
+	it('removes toolbar actions when pressed-state initialization fails', () => {
+		const { toolbarElement, view } = createView();
+		const adapter = createExplorerAdapter(view);
+
+		expect(
+			adapter.addToolbarAction({
+				icon: 'list-ordered',
+				title: 'Toggle force global sorting',
+				callback: vi.fn(),
+				getPressed: () => {
+					throw new Error('pressed state unavailable');
+				},
+			}),
+		).toBeNull();
+		expect(toolbarElement.remove).toHaveBeenCalledOnce();
+	});
+
 	it('rejects toolbar actions without a removable element', () => {
 		const { view } = createView();
 		const adapter = createExplorerAdapter({

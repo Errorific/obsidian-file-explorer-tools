@@ -99,29 +99,34 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			return null;
 		}
 
+		let element: unknown;
 		try {
 			const callback = () => {
 				action.callback();
 				updatePressedState(element, action.getPressed);
 			};
-			const element = registration.add.call(
+			element = registration.add.call(
 				registration.receiver,
 				action.icon,
 				action.title,
 				callback,
 			);
 			if (!isRemovable(element)) {
+				removeToolbarElement(element);
 				this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 				return null;
 			}
-			const update = () => updatePressedState(element, action.getPressed);
+			const removableElement = element;
+			const update = () =>
+				updatePressedState(removableElement, action.getPressed);
 			update();
 			this.toolbarUpdates.add(update);
 			return () => {
 				this.toolbarUpdates.delete(update);
-				element.remove();
+				removableElement.remove();
 			};
 		} catch {
+			removeToolbarElement(element);
 			this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 			return null;
 		}
@@ -225,12 +230,13 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			this: InternalExplorerView,
 			...arguments_: unknown[]
 		): unknown {
+			let result: unknown;
 			try {
-				const result: unknown = Reflect.apply(original, this, arguments_);
-				return sortFolderItems(result, arguments_[0], getOptions);
+				result = Reflect.apply(original, this, arguments_);
 			} catch {
 				return handleSortFailure(arguments_[0]);
 			}
+			return sortFolderItems(result, arguments_[0], getOptions);
 		};
 
 		try {
@@ -370,9 +376,19 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 
 	private handleSortFailure(folder: unknown): unknown[] {
 		this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
-		return isRecord(folder) && isUnknownArray(folder.children)
-			? [...folder.children]
-			: [];
+		if (isRecord(folder) && isUnknownArray(folder.children)) {
+			return [...folder.children];
+		}
+
+		const folderPath = readPath(folder);
+		if (folderPath === null) {
+			return this.readItems()?.map(({ value }) => value.file) ?? [];
+		}
+		const files = this.readItems()?.map(({ value }) => value.file) ?? [];
+		const children = files.filter(
+			(file) => readParentPath(file) === folderPath,
+		);
+		return children.length > 0 ? children : files;
 	}
 
 	private sortFolderItems(
@@ -503,6 +519,30 @@ function isUnknownArray(value: unknown): value is unknown[] {
 
 function isRemovable(value: unknown): value is { remove(): void } {
 	return isRecord(value) && typeof value.remove === 'function';
+}
+
+function removeToolbarElement(value: unknown): void {
+	try {
+		if (isRemovable(value)) {
+			value.remove();
+			return;
+		}
+		if (
+			isRecord(value) &&
+			isRecord(value.parentNode) &&
+			typeof value.parentNode.removeChild === 'function'
+		) {
+			Reflect.apply(value.parentNode.removeChild, value.parentNode, [value]);
+		}
+	} catch {
+		// Compatibility cleanup is best-effort when explorer internals are malformed.
+	}
+}
+
+function readParentPath(value: unknown): string | null {
+	return isRecord(value) && isRecord(value.parent)
+		? readPath(value.parent)
+		: null;
 }
 
 function updatePressedState(
