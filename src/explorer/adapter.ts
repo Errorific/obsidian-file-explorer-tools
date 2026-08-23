@@ -231,7 +231,7 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			}
 			element.classList.toggle(
 				'file-explorer-tools-hidden-revealed',
-				visibility.hidden && visibility.showHidden,
+				visibility.dimmed,
 			);
 			if (visibility.hidden) {
 				element.setAttribute('aria-hidden', String(!visibility.showHidden));

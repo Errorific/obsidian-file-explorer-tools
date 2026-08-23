@@ -14,17 +14,21 @@ If your plugin does not need CSS, delete this file.
 	border-left: 2px solid var(--text-muted);
 }
 
+.file-explorer-tools-hidden-revealed.nav-file-title,
+.file-explorer-tools-hidden-revealed.nav-folder-title,
 .file-explorer-tools-hidden-revealed > .nav-file-title,
 .file-explorer-tools-hidden-revealed > .nav-folder-title,
 .file-explorer-tools-hidden-revealed > .nav-file-title-content,
 .file-explorer-tools-hidden-revealed > .nav-folder-title-content {
-	opacity: 0.55;
+	filter: opacity(55%);
 }
 
+.file-explorer-tools-hidden-revealed.nav-file-title-content,
+.file-explorer-tools-hidden-revealed.nav-folder-title-content,
 .file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-title-content,
 .file-explorer-tools-hidden-revealed > .nav-folder-title .nav-folder-title-content,
 .file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-tag,
 .file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-icon,
 .file-explorer-tools-hidden-revealed > .nav-folder-title .nav-folder-collapse-indicator {
-	opacity: 0.55;
+	filter: opacity(55%);
 }

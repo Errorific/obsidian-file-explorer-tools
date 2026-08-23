@@ -21,6 +21,7 @@ export interface ExplorerItemSnapshot {
 export interface ItemVisibility {
 	hidden: boolean;
 	showHidden: boolean;
+	dimmed: boolean;
 }
 
 export interface ExplorerCompatibilityReport {

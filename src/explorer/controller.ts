@@ -243,12 +243,23 @@ export class ExplorerController {
 
 	private applyVisibility(attached: AttachedExplorer): void {
 		const settings = this.getSettings();
+		const hiddenPaths = settings.hiddenPaths;
 		for (const item of attached.adapter.getItems()) {
 			const hidden = isHidden(settings, item.path);
-			const showHidden =
+			const visible =
 				attached.state.showHidden ||
 				attached.state.temporaryVisiblePaths.has(item.path);
-			attached.adapter.setItemVisibility(item.path, { hidden, showHidden });
+			const hiddenAncestorIsVisible = hiddenPaths.some(
+				(path) =>
+					isPathOrDescendant(item.path, path) &&
+					(attached.state.showHidden ||
+						attached.state.temporaryVisiblePaths.has(path)),
+			);
+			attached.adapter.setItemVisibility(item.path, {
+				hidden,
+				showHidden: visible,
+				dimmed: hiddenAncestorIsVisible,
+			});
 		}
 	}
 
@@ -263,6 +274,10 @@ export class ExplorerController {
 			this.applyVisibility(attached);
 		}
 	}
+}
+
+function isPathOrDescendant(path: string, ancestor: string): boolean {
+	return path === ancestor || path.startsWith(`${ancestor}/`);
 }
 
 function runDisposers(disposers: Array<() => void>): void {

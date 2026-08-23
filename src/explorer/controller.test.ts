@@ -307,6 +307,46 @@ describe('ExplorerController', () => {
 		expect(setItemVisibility).toHaveBeenLastCalledWith('Private.md', {
 			hidden: true,
 			showHidden: true,
+			dimmed: true,
+		});
+	});
+
+	it('dims the visible subtree of a revealed hidden folder', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const hiddenSettings = { ...settings, hiddenPaths: ['Private'] };
+		const setItemVisibility = vi.fn(() => true);
+		const { adapter, actions } = createAdapter({
+			getItems: vi.fn(() => [
+				{
+					path: 'Private',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{
+					path: 'Private/Note.md',
+					folder: false,
+					collapsed: null,
+					selected: false,
+				},
+			]),
+			setItemVisibility,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => hiddenSettings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		actions[1]?.callback();
+
+		expect(setItemVisibility).toHaveBeenLastCalledWith('Private/Note.md', {
+			hidden: false,
+			showHidden: true,
+			dimmed: true,
 		});
 	});
 
