@@ -29,7 +29,6 @@ export interface ToolbarAction {
 	icon: string;
 	title: string;
 	callback: () => void;
-	cssClass?: string;
 	getPressed?: () => boolean;
 }
 

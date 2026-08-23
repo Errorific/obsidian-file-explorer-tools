@@ -168,7 +168,6 @@ export class ExplorerController {
 				icon: 'list-ordered',
 				title: 'Toggle force global sorting',
 				callback: () => this.toggleForceGlobal(),
-				cssClass: 'file-explorer-tools-force-global',
 				getPressed: () => this.forceGlobal,
 			});
 			if (disposeForceGlobalAction !== null) {
