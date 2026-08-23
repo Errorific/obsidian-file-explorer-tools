@@ -4,6 +4,7 @@ import {
 	type FileExplorerToolsSettings,
 	prepareSettings,
 } from './settings';
+import { registerFolderSortMenu } from './sorting/folder-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
 export default class FileExplorerToolsPlugin extends Plugin {
@@ -18,8 +19,15 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		}
 		this.addSettingTab(new FileExplorerToolsSettingsTab(this.app, this));
 		this.explorerController = new ExplorerController(this, {
+			getSettings: () => this.settings,
 			showNotice: (message) => new Notice(message),
 		});
+		this.addCommand({
+			id: 'toggle-force-global-sorting',
+			name: 'Toggle force global sorting',
+			callback: () => this.explorerController?.toggleForceGlobal(),
+		});
+		registerFolderSortMenu(this);
 		this.explorerController.start();
 	}
 
@@ -30,5 +38,6 @@ export default class FileExplorerToolsPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+		this.explorerController?.refreshSorting();
 	}
 }

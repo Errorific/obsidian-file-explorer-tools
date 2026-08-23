@@ -1,4 +1,6 @@
 import type { EventRef } from 'obsidian';
+import { DEFAULT_SETTINGS, type FileExplorerToolsSettings } from '../settings';
+import { createSortingOptions } from '../sorting/order';
 import { createExplorerAdapter } from './adapter';
 import type { ExplorerAdapter } from './adapter-types';
 import { addCompatibilityAction, formatCompatibilityReport } from './toolbar';
@@ -24,14 +26,22 @@ export interface ExplorerPluginHost {
 
 export interface ExplorerControllerOptions {
 	createAdapter?: (view: unknown) => ExplorerAdapter;
+	getSettings?: () => FileExplorerToolsSettings;
 	showNotice: (message: string) => void;
 }
 
+interface AttachedExplorer {
+	adapter: ExplorerAdapter;
+	dispose: () => void;
+}
+
 export class ExplorerController {
-	private readonly attachedLeaves = new Map<ExplorerLeaf, () => void>();
+	private readonly attachedLeaves = new Map<ExplorerLeaf, AttachedExplorer>();
 	private readonly createAdapter: (view: unknown) => ExplorerAdapter;
+	private readonly getSettings: () => FileExplorerToolsSettings;
 	private readonly showNotice: (message: string) => void;
 	private disposed = false;
+	private forceGlobal = false;
 	private started = false;
 
 	constructor(
@@ -39,6 +49,7 @@ export class ExplorerController {
 		options: ExplorerControllerOptions,
 	) {
 		this.createAdapter = options.createAdapter ?? createExplorerAdapter;
+		this.getSettings = options.getSettings ?? (() => DEFAULT_SETTINGS);
 		this.showNotice = options.showNotice;
 	}
 
@@ -64,10 +75,25 @@ export class ExplorerController {
 
 	dispose(): void {
 		this.disposed = true;
-		for (const dispose of this.attachedLeaves.values()) {
-			runSafely(dispose);
+		for (const attached of this.attachedLeaves.values()) {
+			runSafely(attached.dispose);
 		}
 		this.attachedLeaves.clear();
+	}
+
+	isForceGlobal(): boolean {
+		return this.forceGlobal;
+	}
+
+	refreshSorting(): void {
+		for (const { adapter } of this.attachedLeaves.values()) {
+			adapter.runOriginalSort();
+		}
+	}
+
+	toggleForceGlobal(): void {
+		this.forceGlobal = !this.forceGlobal;
+		this.refreshSorting();
 	}
 
 	private attachExplorerLeaves(): void {
@@ -79,9 +105,9 @@ export class ExplorerController {
 			this.plugin.app.workspace.getLeavesOfType(FILE_EXPLORER_VIEW_TYPE),
 		);
 
-		for (const [leaf, dispose] of this.attachedLeaves) {
+		for (const [leaf, attached] of this.attachedLeaves) {
 			if (!currentLeaves.has(leaf)) {
-				runSafely(dispose);
+				runSafely(attached.dispose);
 				this.attachedLeaves.delete(leaf);
 			}
 		}
@@ -92,17 +118,32 @@ export class ExplorerController {
 			}
 
 			try {
-				this.attachedLeaves.set(leaf, this.attachLeaf(leaf));
+				const adapter = this.createAdapter(leaf.view);
+				this.attachedLeaves.set(leaf, {
+					adapter,
+					dispose: this.attachLeaf(adapter),
+				});
 			} catch {
 				runSafely(() => this.showNotice(ATTACHMENT_FAILURE_MESSAGE));
 			}
 		}
 	}
 
-	private attachLeaf(leaf: ExplorerLeaf): () => void {
+	private attachLeaf(adapter: ExplorerAdapter): () => void {
 		const disposers: Array<() => void> = [];
 		try {
-			const adapter = this.createAdapter(leaf.view);
+			const disposeSorting = adapter.installSorting((folderPath, coreSortMode) =>
+				createSortingOptions(
+					this.getSettings(),
+					folderPath,
+					coreSortMode,
+					this.forceGlobal,
+				),
+			);
+			if (disposeSorting !== null) {
+				disposers.push(disposeSorting);
+			}
+
 			let renderCount = 0;
 			const disposeRenderObserver = adapter.observeRenders(() => {
 				renderCount += 1;
@@ -120,6 +161,16 @@ export class ExplorerController {
 				disposers.push(disposeToolbarAction);
 			}
 
+			const disposeForceGlobalAction = adapter.addToolbarAction({
+				icon: 'list-ordered',
+				title: 'Toggle force global sorting',
+				callback: () => this.toggleForceGlobal(),
+			});
+			if (disposeForceGlobalAction !== null) {
+				disposers.push(disposeForceGlobalAction);
+			}
+
+			adapter.runOriginalSort();
 			const report = adapter.getCompatibilityReport();
 			if (!report.available) {
 				runSafely(() =>
