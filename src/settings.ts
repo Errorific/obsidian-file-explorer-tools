@@ -19,14 +19,14 @@ export interface FolderConfiguration {
 export interface FileExplorerToolsSettings {
 	[key: string]: unknown;
 	schemaVersion: number;
-	groupFoldersFirst: boolean;
+	mixFilesAndFolders: boolean;
 	hiddenPaths: string[];
 	folders: Record<string, FolderConfiguration>;
 }
 
 export const DEFAULT_SETTINGS: Readonly<FileExplorerToolsSettings> = {
 	schemaVersion: SETTINGS_SCHEMA_VERSION,
-	groupFoldersFirst: false,
+	mixFilesAndFolders: false,
 	hiddenPaths: [],
 	folders: {},
 };
@@ -49,11 +49,8 @@ export interface PreparedSettings {
 	needsSave: boolean;
 }
 
-export function prepareSettings(
-	data: unknown,
-	vault: VaultLookup,
-): PreparedSettings {
-	const settings = reconcileSettings(loadSettings(data), vault);
+export function prepareSettings(data: unknown): PreparedSettings {
+	const settings = loadSettings(data);
 	return {
 		settings,
 		needsSave: JSON.stringify(data) !== JSON.stringify(settings),
@@ -68,6 +65,13 @@ export function migrateSettings(data: unknown): SettingsRecord {
 	const settings = isRecord(data) ? { ...data } : {};
 	const version = readSchemaVersion(settings.schemaVersion);
 
+	if (
+		typeof settings.groupFoldersFirst === 'boolean' &&
+		typeof settings.mixFilesAndFolders !== 'boolean'
+	) {
+		settings.mixFilesAndFolders = !settings.groupFoldersFirst;
+	}
+	delete settings.groupFoldersFirst;
 	if (version < 1) {
 		settings.schemaVersion = 1;
 	}
@@ -115,10 +119,10 @@ function normalizeSettings(settings: SettingsRecord): FileExplorerToolsSettings 
 		...settings,
 		schemaVersion:
 			schemaVersion === 0 ? SETTINGS_SCHEMA_VERSION : schemaVersion,
-		groupFoldersFirst:
-			typeof settings.groupFoldersFirst === 'boolean'
-				? settings.groupFoldersFirst
-				: DEFAULT_SETTINGS.groupFoldersFirst,
+		mixFilesAndFolders:
+			typeof settings.mixFilesAndFolders === 'boolean'
+				? settings.mixFilesAndFolders
+				: DEFAULT_SETTINGS.mixFilesAndFolders,
 		hiddenPaths: readUniqueStrings(settings.hiddenPaths),
 		folders: readFolderConfigurations(settings.folders),
 	};

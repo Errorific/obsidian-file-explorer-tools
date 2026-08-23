@@ -20,13 +20,30 @@ function createView() {
 		}),
 	};
 	const selected = new Set<FakeItem>();
-	const toolbarElement = { remove: vi.fn() };
+	const toolbarElement = {
+		classList: { toggle: vi.fn() },
+		remove: vi.fn(),
+		setAttribute: vi.fn(),
+	};
+	let toolbarCallback: ((event: MouseEvent) => unknown) | null = null;
 	const view = {
-		addAction: vi.fn(() => toolbarElement),
+		addAction: vi.fn(
+			(
+				_icon: string,
+				_title: string,
+				callback: (event: MouseEvent) => unknown,
+			) => {
+				toolbarCallback = callback;
+				return toolbarElement;
+			},
+		),
 		fileItems: {
 			'Welcome.md': fileItem,
 			Projects: folderItem,
 		},
+		getSortedFolderItems: vi.fn(
+			(folder: { path?: string; children: unknown[] }) => [...folder.children],
+		),
 		navFileContainerEl: { nodeType: 1 },
 		sort: vi.fn(),
 		sortOrder: 'alphabetical',
@@ -41,7 +58,14 @@ function createView() {
 		},
 	};
 
-	return { fileItem, folderItem, selected, toolbarElement, view };
+	return {
+		fileItem,
+		folderItem,
+		selected,
+		toolbarElement,
+		triggerToolbar: () => toolbarCallback?.({} as MouseEvent),
+		view,
+	};
 }
 
 function createObserverFactory() {
@@ -105,6 +129,7 @@ describe('createExplorerAdapter', () => {
 				'observe explorer renders',
 				'read core sort mode',
 				'run core sorting',
+				'apply custom sorting',
 				'expand and collapse folders',
 				'select items',
 				'scroll to items',
@@ -119,6 +144,77 @@ describe('createExplorerAdapter', () => {
 		expect(adapter.collapse('Projects')).toBe(false);
 		expect(adapter.select('Welcome.md')).toBe(false);
 		expect(adapter.scrollTo('Welcome.md')).toBe(false);
+	});
+
+	it('sorts explorer item wrappers using their underlying vault items', () => {
+		const { view } = createView();
+		const folder = {
+			path: 'Projects',
+			children: [
+				{
+					path: 'Projects/Alpha.md',
+					name: 'Alpha.md',
+					stat: { ctime: 10, mtime: 10 },
+				},
+				{
+					path: 'Projects/Folder',
+					name: 'Folder',
+					children: [],
+				},
+				{
+					path: 'Projects/Zulu.md',
+					name: 'Zulu.md',
+					stat: { ctime: 20, mtime: 20 },
+				},
+			],
+		};
+		const wrappers = folder.children.map((file) => ({ file }));
+		view.getSortedFolderItems.mockImplementation(() => wrappers);
+		const adapter = createExplorerAdapter(view);
+
+		const dispose = adapter.installSorting(() => ({
+			mixFilesAndFolders: true,
+			prefixPositions: new Map([['Zulu.md', 0]]),
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems(folder)).toEqual([
+			wrappers[2],
+			wrappers[0],
+			wrappers[1],
+		]);
+
+		dispose?.();
+		expect(view.getSortedFolderItems(folder)).toEqual(wrappers);
+	});
+
+	it('preserves native child sorting failures without synthesizing results', () => {
+		const { view } = createView();
+		const error = new Error('incompatible child sorting');
+		view.getSortedFolderItems.mockImplementation(() => {
+			throw error;
+		});
+		const adapter = createExplorerAdapter(view);
+		adapter.installSorting(() => ({
+			mixFilesAndFolders: false,
+			sortMode: 'name-ascending',
+		}));
+
+		expect(() =>
+			view.getSortedFolderItems({ path: '', children: [] }),
+		).toThrow(error);
+	});
+
+	it('leaves native results unchanged when sorting metadata is unavailable', () => {
+		const { view } = createView();
+		const adapter = createExplorerAdapter(view);
+		const children = [{ name: 'Missing path' }];
+		adapter.installSorting(() => ({
+			mixFilesAndFolders: false,
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems({ path: '', children })).toEqual(children);
 	});
 
 	it('runs the sort implementation captured during attachment', () => {
@@ -196,7 +292,7 @@ describe('createExplorerAdapter', () => {
 	});
 
 	it('adds and removes toolbar actions', () => {
-		const { toolbarElement, view } = createView();
+		const { toolbarElement, triggerToolbar, view } = createView();
 		const adapter = createExplorerAdapter(view);
 		const callback = vi.fn();
 
@@ -209,9 +305,61 @@ describe('createExplorerAdapter', () => {
 		expect(view.addAction).toHaveBeenCalledWith(
 			'wrench',
 			'Check compatibility',
-			callback,
+			expect.any(Function),
 		);
+		triggerToolbar();
+		expect(callback).toHaveBeenCalledOnce();
 		dispose?.();
+		expect(toolbarElement.remove).toHaveBeenCalledOnce();
+	});
+
+	it('updates pressed state for toolbar toggles', () => {
+		const { toolbarElement, triggerToolbar, view } = createView();
+		const adapter = createExplorerAdapter(view);
+		let pressed = false;
+
+		adapter.addToolbarAction({
+			icon: 'list-ordered',
+			title: 'Toggle force global sorting',
+			callback: () => {
+				pressed = !pressed;
+			},
+			getPressed: () => pressed,
+		});
+
+		expect(toolbarElement.classList.toggle).toHaveBeenCalledWith(
+			'is-active',
+			false,
+		);
+		expect(toolbarElement.setAttribute).toHaveBeenCalledWith(
+			'aria-pressed',
+			'false',
+		);
+		triggerToolbar();
+		expect(toolbarElement.setAttribute).toHaveBeenLastCalledWith(
+			'aria-pressed',
+			'true',
+		);
+		expect(toolbarElement.classList.toggle).toHaveBeenLastCalledWith(
+			'is-active',
+			true,
+		);
+	});
+
+	it('removes toolbar actions when pressed-state initialization fails', () => {
+		const { toolbarElement, view } = createView();
+		const adapter = createExplorerAdapter(view);
+
+		expect(
+			adapter.addToolbarAction({
+				icon: 'list-ordered',
+				title: 'Toggle force global sorting',
+				callback: vi.fn(),
+				getPressed: () => {
+					throw new Error('pressed state unavailable');
+				},
+			}),
+		).toBeNull();
 		expect(toolbarElement.remove).toHaveBeenCalledOnce();
 	});
 
@@ -253,7 +401,7 @@ describe('createExplorerAdapter', () => {
 		expect(addNavButton).toHaveBeenCalledWith(
 			'wrench',
 			'Check compatibility',
-			callback,
+			expect.any(Function),
 		);
 		dispose?.();
 		expect(toolbarElement.remove).toHaveBeenCalledOnce();

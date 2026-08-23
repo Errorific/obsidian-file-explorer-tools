@@ -1,12 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ExplorerAdapter } from './adapter-types';
+import type { FileExplorerToolsSettings } from '../settings';
+import type { ExplorerAdapter, ToolbarAction } from './adapter-types';
 import {
 	ExplorerController,
 	type ExplorerLeaf,
 	type ExplorerPluginHost,
 } from './controller';
 
+const settings: FileExplorerToolsSettings = {
+	schemaVersion: 1,
+	mixFilesAndFolders: false,
+	hiddenPaths: [],
+	folders: {},
+};
+
 function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
+	const actions: ToolbarAction[] = [];
 	const disposeObserver = vi.fn();
 	const disposeToolbar = vi.fn();
 	const getCompatibilityReport: ExplorerAdapter['getCompatibilityReport'] =
@@ -18,20 +27,37 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		}));
 	const getSortMode: ExplorerAdapter['getSortMode'] =
 		vi.fn<ExplorerAdapter['getSortMode']>(() => 'alphabetical');
+	const installSorting: ExplorerAdapter['installSorting'] = vi.fn(() => vi.fn());
+	const runOriginalSort: ExplorerAdapter['runOriginalSort'] = vi.fn(() => true);
+	const addToolbarAction: ExplorerAdapter['addToolbarAction'] = vi.fn(
+		(action: ToolbarAction) => {
+			actions.push(action);
+			return disposeToolbar;
+		},
+	);
 	const adapter: ExplorerAdapter = {
-		addToolbarAction: vi.fn(() => disposeToolbar),
+		addToolbarAction,
 		collapse: vi.fn(() => true),
 		expand: vi.fn(() => true),
 		getCompatibilityReport,
 		getItems: vi.fn(() => []),
 		getSortMode,
+		installSorting,
 		observeRenders: vi.fn(() => disposeObserver),
-		runOriginalSort: vi.fn(() => true),
+		refreshToolbarActions: vi.fn(),
+		runOriginalSort,
 		scrollTo: vi.fn(() => true),
 		select: vi.fn(() => true),
 		...overrides,
 	};
-	return { adapter, disposeObserver, disposeToolbar };
+	return {
+		actions,
+		adapter,
+		disposeObserver,
+		disposeToolbar,
+		installSorting,
+		runOriginalSort,
+	};
 }
 
 function createHost(initialLeaves: ExplorerLeaf[]) {
@@ -90,7 +116,7 @@ describe('ExplorerController', () => {
 		expect(registerEvent).toHaveBeenCalledOnce();
 
 		controller.dispose();
-		expect(disposeToolbar).toHaveBeenCalledOnce();
+		expect(disposeToolbar).toHaveBeenCalledTimes(2);
 		expect(disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -115,12 +141,12 @@ describe('ExplorerController', () => {
 		setLeaves([secondLeaf]);
 		triggerLayoutChange();
 
-		expect(first.disposeToolbar).toHaveBeenCalledOnce();
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(2);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledOnce();
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(2);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -147,7 +173,7 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(first.disposeToolbar).toHaveBeenCalledOnce();
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(2);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 		expect(showNotice).toHaveBeenCalledWith(
@@ -155,7 +181,7 @@ describe('ExplorerController', () => {
 		);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledOnce();
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(2);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -197,5 +223,57 @@ describe('ExplorerController', () => {
 
 		expect(createAdapterForView).not.toHaveBeenCalled();
 		expect(registerEvent).not.toHaveBeenCalled();
+	});
+
+	it('shares force-global sorting across attached and later leaves', () => {
+		const firstLeaf = { view: { id: 'first' } };
+		const secondLeaf = { view: { id: 'second' } };
+		const { host, setLeaves, triggerLayoutChange, triggerLayoutReady } =
+			createHost([firstLeaf]);
+		const first = createAdapter();
+		const second = createAdapter();
+		const createAdapterForView = vi
+			.fn()
+			.mockReturnValueOnce(first.adapter)
+			.mockReturnValueOnce(second.adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			getSettings: () => settings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		expect(first.actions).toHaveLength(2);
+		first.actions[1]?.callback();
+
+		expect(controller.isForceGlobal()).toBe(true);
+		expect(first.runOriginalSort).toHaveBeenCalledTimes(2);
+
+		setLeaves([firstLeaf, secondLeaf]);
+		triggerLayoutChange();
+		const provider = vi.mocked(second.installSorting).mock.calls[0]?.[0];
+		expect(provider?.('', 'alphabetical')).toMatchObject({
+			sortMode: 'name-ascending',
+			prefixPositions: new Map(),
+		});
+		expect(second.runOriginalSort).toHaveBeenCalledOnce();
+	});
+
+	it('reapplies sorting when settings change', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const { adapter, runOriginalSort } = createAdapter();
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => settings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.refreshSorting();
+
+		expect(runOriginalSort).toHaveBeenCalledTimes(2);
 	});
 });

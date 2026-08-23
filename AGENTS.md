@@ -8,8 +8,9 @@
 
 ## Environment & tooling
 
-- Node.js: use current LTS (Node 18+ recommended).
+- Node.js and npm are pinned in `mise.toml`. Run repository commands through the activated mise environment. Keep the npm tool before Node in that file so the pinned npm executable takes precedence on `PATH`.
 - **Package manager: npm** (required for this sample - `package.json` defines npm scripts and dependencies).
+- Generate `package-lock.json` with the pinned npm version and run `npm ci` after dependency changes. Newer npm versions can omit optional peer entries required by the Node 20 and 22 CI jobs.
 - **Bundler: esbuild** (required for this sample - `esbuild.config.mjs` and build scripts depend on it). Alternative bundlers like Rollup or webpack are acceptable for other projects if they bundle all external dependencies into `main.js`.
 - Types: `obsidian` type definitions.
 
@@ -18,7 +19,8 @@
 ### Install
 
 ```bash
-npm install
+mise install
+npm ci
 ```
 
 ### Dev (watch)

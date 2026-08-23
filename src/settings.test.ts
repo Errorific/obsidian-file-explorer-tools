@@ -16,13 +16,34 @@ describe('migrateSettings', () => {
 	it('adds version 1 without discarding stored fields', () => {
 		expect(
 			migrateSettings({
-				groupFoldersFirst: true,
+				mixFilesAndFolders: true,
 				hiddenPaths: ['Private'],
 			}),
 		).toEqual({
 			schemaVersion: 1,
-			groupFoldersFirst: true,
+			mixFilesAndFolders: true,
 			hiddenPaths: ['Private'],
+		});
+	});
+
+	it('preserves behavior while replacing the inverted folder grouping field', () => {
+		expect(
+			migrateSettings({
+				schemaVersion: 1,
+				groupFoldersFirst: false,
+			}),
+		).toEqual({
+			schemaVersion: 1,
+			mixFilesAndFolders: true,
+		});
+		expect(
+			migrateSettings({
+				schemaVersion: 1,
+				groupFoldersFirst: true,
+			}),
+		).toEqual({
+			schemaVersion: 1,
+			mixFilesAndFolders: false,
 		});
 	});
 
@@ -49,7 +70,7 @@ describe('loadSettings', () => {
 		expect(
 			loadSettings({
 				schemaVersion: 1,
-				groupFoldersFirst: true,
+				mixFilesAndFolders: true,
 				hiddenPaths: ['Private', 'Private', 'Archive'],
 				folders: {
 					'': {
@@ -61,7 +82,7 @@ describe('loadSettings', () => {
 			}),
 		).toEqual({
 			schemaVersion: 1,
-			groupFoldersFirst: true,
+			mixFilesAndFolders: true,
 			hiddenPaths: ['Private', 'Archive'],
 			folders: {
 				'': {
@@ -88,7 +109,7 @@ describe('loadSettings', () => {
 		).toEqual({
 			schemaVersion: 2,
 			futureSetting: true,
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			hiddenPaths: [],
 			folders: {
 				Projects: {
@@ -103,7 +124,7 @@ describe('loadSettings', () => {
 		expect(
 			loadSettings({
 				schemaVersion: 'one',
-				groupFoldersFirst: 'yes',
+				mixFilesAndFolders: 'yes',
 				hiddenPaths: ['Private', null, 42],
 				folders: {
 					Invalid: null,
@@ -115,7 +136,7 @@ describe('loadSettings', () => {
 			}),
 		).toEqual({
 			schemaVersion: 1,
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			hiddenPaths: ['Private'],
 			folders: {
 				Projects: { orderedPrefix: [] },
@@ -126,20 +147,19 @@ describe('loadSettings', () => {
 
 describe('prepareSettings', () => {
 	it('reports when migrated settings need to be saved', () => {
-		const vault = new FakeVault();
-		const prepared = prepareSettings({ futureSetting: true }, vault);
+		const prepared = prepareSettings({ futureSetting: true });
 
 		expect(prepared).toEqual({
 			needsSave: true,
 			settings: {
 				schemaVersion: 1,
 				futureSetting: true,
-				groupFoldersFirst: false,
+				mixFilesAndFolders: false,
 				hiddenPaths: [],
 				folders: {},
 			},
 		});
-		expect(prepareSettings(prepared.settings, vault).needsSave).toBe(false);
+		expect(prepareSettings(prepared.settings).needsSave).toBe(false);
 	});
 });
 
@@ -162,7 +182,7 @@ describe('reconcileSettings', () => {
 
 		expect(reconcileSettings(settings, vault)).toEqual({
 			schemaVersion: 1,
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			hiddenPaths: ['Inbox.md'],
 			folders: {
 				'': { orderedPrefix: ['Projects'] },
@@ -179,7 +199,7 @@ describe('reconcileSettings', () => {
 		const settings = {
 			schemaVersion: 2,
 			futureSetting: true,
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			hiddenPaths: [],
 			folders: {
 				Projects: {
@@ -192,7 +212,7 @@ describe('reconcileSettings', () => {
 		expect(reconcileSettings(settings, vault)).toEqual({
 			schemaVersion: 2,
 			futureSetting: true,
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			hiddenPaths: [],
 			folders: {
 				Projects: {

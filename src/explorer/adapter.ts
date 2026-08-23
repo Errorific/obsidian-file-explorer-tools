@@ -1,9 +1,11 @@
+import { compareExplorerItems, type ExplorerSortItem } from '../sorting/comparator';
 import {
 	CORE_SORT_MODES,
 	type CoreSortMode,
 	type ExplorerAdapter,
 	type ExplorerCompatibilityReport,
 	type ExplorerItemSnapshot,
+	type SortingOptionsProvider,
 	type ToolbarAction,
 } from './adapter-types';
 
@@ -42,6 +44,7 @@ interface InternalExplorerView {
 		callback: (event: MouseEvent) => unknown,
 	) => unknown;
 	fileItems?: unknown;
+	getSortedFolderItems?: UnknownFunction;
 	headerDom?: InternalExplorerHeader;
 	navFileContainerEl?: Node;
 	sort?: UnknownFunction;
@@ -63,6 +66,7 @@ const CAPABILITY_LABELS = {
 	renders: 'observe explorer renders',
 	sortMode: 'read core sort mode',
 	sort: 'run core sorting',
+	customSort: 'apply custom sorting',
 	collapse: 'expand and collapse folders',
 	select: 'select items',
 	scroll: 'scroll to items',
@@ -80,6 +84,7 @@ export function createExplorerAdapter(
 class ObsidianExplorerAdapter implements ExplorerAdapter {
 	private readonly originalSort: UnknownFunction | null;
 	private readonly failedCapabilities = new Set<string>();
+	private readonly toolbarUpdates = new Set<() => void>();
 
 	constructor(
 		private readonly view: InternalExplorerView,
@@ -94,19 +99,34 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			return null;
 		}
 
+		let element: unknown;
 		try {
-			const element = registration.add.call(
+			const callback = () => {
+				action.callback();
+				updatePressedState(element, action.getPressed);
+			};
+			element = registration.add.call(
 				registration.receiver,
 				action.icon,
 				action.title,
-				action.callback,
+				callback,
 			);
 			if (!isRemovable(element)) {
+				removeToolbarElement(element);
 				this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 				return null;
 			}
-			return () => element.remove();
+			const removableElement = element;
+			const update = () =>
+				updatePressedState(removableElement, action.getPressed);
+			update();
+			this.toolbarUpdates.add(update);
+			return () => {
+				this.toolbarUpdates.delete(update);
+				removableElement.remove();
+			};
 		} catch {
+			removeToolbarElement(element);
 			this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 			return null;
 		}
@@ -144,6 +164,11 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			unavailableCapabilities,
 			CAPABILITY_LABELS.sort,
 			this.originalSort === null,
+		);
+		this.addUnavailable(
+			unavailableCapabilities,
+			CAPABILITY_LABELS.customSort,
+			typeof this.view.getSortedFolderItems !== 'function',
 		);
 		this.addUnavailable(
 			unavailableCapabilities,
@@ -193,6 +218,34 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		return isCoreSortMode(this.view.sortOrder) ? this.view.sortOrder : null;
 	}
 
+	installSorting(getOptions: SortingOptionsProvider): (() => void) | null {
+		const original = this.view.getSortedFolderItems;
+		if (typeof original !== 'function') {
+			return null;
+		}
+
+		const sortFolderItems = this.sortFolderItems.bind(this);
+		const sortedFolderItems = function (
+			this: InternalExplorerView,
+			...arguments_: unknown[]
+		): unknown {
+			const result: unknown = Reflect.apply(original, this, arguments_);
+			return sortFolderItems(result, arguments_[0], getOptions);
+		};
+
+		try {
+			this.view.getSortedFolderItems = sortedFolderItems;
+		} catch {
+			this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
+			return null;
+		}
+		return () => {
+			if (this.view.getSortedFolderItems === sortedFolderItems) {
+				this.view.getSortedFolderItems = original;
+			}
+		};
+	}
+
 	observeRenders(callback: () => void): (() => void) | null {
 		const container = this.view.navFileContainerEl;
 		if (!isNode(container)) {
@@ -206,6 +259,12 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		} catch {
 			this.failedCapabilities.add(CAPABILITY_LABELS.renders);
 			return null;
+		}
+	}
+
+	refreshToolbarActions(): void {
+		for (const update of this.toolbarUpdates) {
+			update();
 		}
 	}
 
@@ -309,6 +368,39 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		});
 	}
 
+	private sortFolderItems(
+		result: unknown,
+		folder: unknown,
+		getOptions: SortingOptionsProvider,
+	): unknown {
+		const coreSortMode = this.getSortMode();
+		const folderPath = readPath(folder);
+		if (!isUnknownArray(result) || coreSortMode === null || folderPath === null) {
+			return result;
+		}
+
+		const items = result.map(readSortItem);
+		if (items.some((item) => item === null)) {
+			return result;
+		}
+
+		try {
+			const options = getOptions(folderPath, coreSortMode);
+			return result
+				.map((value, index) => ({
+					item: items[index] as ExplorerSortItem,
+					value,
+				}))
+				.sort((left, right) =>
+					compareExplorerItems(left.item, right.item, options),
+				)
+				.map(({ value }) => value);
+		} catch {
+			this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
+			return result;
+		}
+	}
+
 	private setCollapsed(path: string, collapsed: boolean): boolean {
 		const item = this.findItem(path);
 		if (item === null || typeof item.setCollapsed !== 'function') {
@@ -323,6 +415,41 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			return false;
 		}
 	}
+}
+
+function readSortItem(value: unknown): ExplorerSortItem | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const file = isRecord(value.file) ? value.file : value;
+	const path = readPath(file);
+	if (path === null) {
+		return null;
+	}
+
+	const folder = Array.isArray(file.children);
+	const stat = isRecord(file.stat) ? file.stat : null;
+	return {
+		path,
+		name: typeof file.name === 'string' ? file.name : nameOf(path),
+		folder,
+		createdAt: folder ? null : readTimestamp(stat?.ctime),
+		modifiedAt: folder ? null : readTimestamp(stat?.mtime),
+	};
+}
+
+function readPath(value: unknown): string | null {
+	return isRecord(value) && typeof value.path === 'string' ? value.path : null;
+}
+
+function readTimestamp(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function nameOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? path : path.slice(separatorIndex + 1);
 }
 
 function asExplorerView(value: unknown): InternalExplorerView {
@@ -364,8 +491,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
 
+function isUnknownArray(value: unknown): value is unknown[] {
+	return Array.isArray(value);
+}
+
 function isRemovable(value: unknown): value is { remove(): void } {
 	return isRecord(value) && typeof value.remove === 'function';
+}
+
+function removeToolbarElement(value: unknown): void {
+	try {
+		if (isRemovable(value)) {
+			value.remove();
+			return;
+		}
+		if (
+			isRecord(value) &&
+			isRecord(value.parentNode) &&
+			typeof value.parentNode.removeChild === 'function'
+		) {
+			Reflect.apply(value.parentNode.removeChild, value.parentNode, [value]);
+		}
+	} catch {
+		// Compatibility cleanup is best-effort when explorer internals are malformed.
+	}
+}
+
+function updatePressedState(
+	element: unknown,
+	getPressed: (() => boolean) | undefined,
+): void {
+	if (getPressed === undefined || !isRecord(element)) {
+		return;
+	}
+
+	const pressed = getPressed();
+	if (typeof element.setAttribute === 'function') {
+		Reflect.apply(element.setAttribute, element, [
+			'aria-pressed',
+			String(pressed),
+		]);
+	}
+	if (
+		isRecord(element.classList) &&
+		typeof element.classList.toggle === 'function'
+	) {
+		Reflect.apply(element.classList.toggle, element.classList, [
+			'is-active',
+			pressed,
+		]);
+	}
 }
 
 function readFunction(value: unknown): UnknownFunction | null {
