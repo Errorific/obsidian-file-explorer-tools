@@ -225,17 +225,11 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}
 
 		const sortFolderItems = this.sortFolderItems.bind(this);
-		const handleSortFailure = this.handleSortFailure.bind(this);
 		const sortedFolderItems = function (
 			this: InternalExplorerView,
 			...arguments_: unknown[]
 		): unknown {
-			let result: unknown;
-			try {
-				result = Reflect.apply(original, this, arguments_);
-			} catch {
-				return handleSortFailure(arguments_[0]);
-			}
+			const result: unknown = Reflect.apply(original, this, arguments_);
 			return sortFolderItems(result, arguments_[0], getOptions);
 		};
 
@@ -372,23 +366,6 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			const path = value.file.path;
 			return typeof path === 'string' ? [{ path, value }] : [];
 		});
-	}
-
-	private handleSortFailure(folder: unknown): unknown[] {
-		this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
-		if (isRecord(folder) && isUnknownArray(folder.children)) {
-			return [...folder.children];
-		}
-
-		const folderPath = readPath(folder);
-		if (folderPath === null) {
-			return this.readItems()?.map(({ value }) => value.file) ?? [];
-		}
-		const files = this.readItems()?.map(({ value }) => value.file) ?? [];
-		const children = files.filter(
-			(file) => readParentPath(file) === folderPath,
-		);
-		return children.length > 0 ? children : files;
 	}
 
 	private sortFolderItems(
@@ -538,12 +515,6 @@ function removeToolbarElement(value: unknown): void {
 	} catch {
 		// Compatibility cleanup is best-effort when explorer internals are malformed.
 	}
-}
-
-function readParentPath(value: unknown): string | null {
-	return isRecord(value) && isRecord(value.parent)
-		? readPath(value.parent)
-		: null;
 }
 
 function updatePressedState(

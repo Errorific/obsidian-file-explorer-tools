@@ -188,22 +188,21 @@ describe('createExplorerAdapter', () => {
 		expect(view.getSortedFolderItems(folder)).toEqual(wrappers);
 	});
 
-	it('falls back to folder children when native child sorting fails', () => {
+	it('preserves native child sorting failures without synthesizing results', () => {
 		const { view } = createView();
+		const error = new Error('incompatible child sorting');
 		view.getSortedFolderItems.mockImplementation(() => {
-			throw new Error('incompatible child sorting');
+			throw error;
 		});
 		const adapter = createExplorerAdapter(view);
-		const children = [{ path: 'Alpha.md' }, { path: 'Zulu.md' }];
 		adapter.installSorting(() => ({
 			mixFilesAndFolders: false,
 			sortMode: 'name-ascending',
 		}));
 
-		expect(view.getSortedFolderItems({ path: '', children })).toEqual(children);
-		expect(adapter.getCompatibilityReport().unavailableCapabilities).toContain(
-			'apply custom sorting',
-		);
+		expect(() =>
+			view.getSortedFolderItems({ path: '', children: [] }),
+		).toThrow(error);
 	});
 
 	it('leaves native results unchanged when sorting metadata is unavailable', () => {
