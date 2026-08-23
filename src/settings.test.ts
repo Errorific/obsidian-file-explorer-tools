@@ -147,8 +147,7 @@ describe('loadSettings', () => {
 
 describe('prepareSettings', () => {
 	it('reports when migrated settings need to be saved', () => {
-		const vault = new FakeVault();
-		const prepared = prepareSettings({ futureSetting: true }, vault);
+		const prepared = prepareSettings({ futureSetting: true });
 
 		expect(prepared).toEqual({
 			needsSave: true,
@@ -160,7 +159,7 @@ describe('prepareSettings', () => {
 				folders: {},
 			},
 		});
-		expect(prepareSettings(prepared.settings, vault).needsSave).toBe(false);
+		expect(prepareSettings(prepared.settings).needsSave).toBe(false);
 	});
 });
 

@@ -49,11 +49,8 @@ export interface PreparedSettings {
 	needsSave: boolean;
 }
 
-export function prepareSettings(
-	data: unknown,
-	vault: VaultLookup,
-): PreparedSettings {
-	const settings = reconcileSettings(loadSettings(data), vault);
+export function prepareSettings(data: unknown): PreparedSettings {
+	const settings = loadSettings(data);
 	return {
 		settings,
 		needsSave: JSON.stringify(data) !== JSON.stringify(settings),

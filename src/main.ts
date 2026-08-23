@@ -3,6 +3,7 @@ import { ExplorerController } from './explorer/controller';
 import {
 	type FileExplorerToolsSettings,
 	prepareSettings,
+	reconcileSettings,
 } from './settings';
 import { applyDelete, applyRename } from './settings-events';
 import { registerFolderSortMenu } from './sorting/folder-menu';
@@ -11,9 +12,11 @@ import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 export default class FileExplorerToolsPlugin extends Plugin {
 	settings!: FileExplorerToolsSettings;
 	private explorerController: ExplorerController | null = null;
+	private unloaded = false;
 
 	async onload(): Promise<void> {
-		const prepared = prepareSettings(await this.loadData(), this.app.vault);
+		this.unloaded = false;
+		const prepared = prepareSettings(await this.loadData());
 		this.settings = prepared.settings;
 		if (prepared.needsSave) {
 			await this.saveSettings();
@@ -29,6 +32,16 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			callback: () => this.explorerController?.toggleForceGlobal(),
 		});
 		registerFolderSortMenu(this);
+		this.app.workspace.onLayoutReady(() => {
+			if (this.unloaded) {
+				return;
+			}
+			const reconciled = reconcileSettings(this.settings, this.app.vault);
+			if (JSON.stringify(reconciled) !== JSON.stringify(this.settings)) {
+				this.settings = reconciled;
+				void this.saveSettings();
+			}
+		});
 		this.registerEvent(
 			this.app.vault.on('rename', (file, oldPath) => {
 				if (applyRename(this.settings, oldPath, file.path)) {
@@ -47,6 +60,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		this.unloaded = true;
 		this.explorerController?.dispose();
 		this.explorerController = null;
 	}
