@@ -122,6 +122,36 @@ describe('compareExplorerItems', () => {
 		).toEqual(['Areas', 'Projects', 'Alpha.md', 'Zulu.md']);
 	});
 
+	it('keeps prefix ordering ahead of type grouping and time sorting', () => {
+		expect(
+			sortedPaths(
+				[
+					folder('Folder'),
+					file('Old.md', 10, 10),
+					file('Pinned.md', 5, 5),
+					file('Recent.md', 20, 20),
+				],
+				{
+					groupFoldersFirst: true,
+					prefixPositions: new Map([['Pinned.md', 0]]),
+					sortMode: 'modified-descending',
+				},
+			),
+		).toEqual(['Pinned.md', 'Folder', 'Recent.md', 'Old.md']);
+	});
+
+	it('uses deterministic paths when timestamps are equal or missing', () => {
+		const missing = { ...file('Missing.md'), modifiedAt: null };
+		const otherMissing = { ...file('missing.md'), modifiedAt: null };
+		const sameTime = file('Same-time.md', 10, 10);
+
+		expect(
+			sortedPaths([otherMissing, sameTime, missing], {
+				sortMode: 'modified-descending',
+			}),
+		).toEqual(['Missing.md', 'missing.md', 'Same-time.md']);
+	});
+
 	it('uses paths as deterministic tie-breakers', () => {
 		const left = { ...file('one/Same.md', 10, 10), name: 'Same.md' };
 		const right = { ...file('two/Same.md', 10, 10), name: 'Same.md' };
@@ -129,5 +159,14 @@ describe('compareExplorerItems', () => {
 		expect(
 			sortedPaths([right, left], { sortMode: 'modified-ascending' }),
 		).toEqual(['one/Same.md', 'two/Same.md']);
+	});
+
+	it('distinguishes case-only path differences in the final tie-breaker', () => {
+		const upper = { ...file('A.md', 10, 10), name: 'same.md' };
+		const lower = { ...file('a.md', 10, 10), name: 'same.md' };
+
+		expect(
+			sortedPaths([lower, upper], { sortMode: 'modified-ascending' }),
+		).toEqual(['A.md', 'a.md']);
 	});
 });

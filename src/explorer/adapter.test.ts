@@ -182,6 +182,24 @@ describe('createExplorerAdapter', () => {
 		expect(view.getSortedFolderItems(folder)).toEqual(folder.children);
 	});
 
+	it('falls back to folder children when native child sorting fails', () => {
+		const { view } = createView();
+		view.getSortedFolderItems.mockImplementation(() => {
+			throw new Error('incompatible child sorting');
+		});
+		const adapter = createExplorerAdapter(view);
+		const children = [{ path: 'Alpha.md' }, { path: 'Zulu.md' }];
+		adapter.installSorting(() => ({
+			groupFoldersFirst: false,
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems({ path: '', children })).toEqual(children);
+		expect(adapter.getCompatibilityReport().unavailableCapabilities).toContain(
+			'apply custom sorting',
+		);
+	});
+
 	it('leaves native results unchanged when sorting metadata is unavailable', () => {
 		const { view } = createView();
 		const adapter = createExplorerAdapter(view);

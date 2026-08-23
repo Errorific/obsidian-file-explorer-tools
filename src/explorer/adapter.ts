@@ -220,15 +220,25 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}
 
 		const sortFolderItems = this.sortFolderItems.bind(this);
+		const handleSortFailure = this.handleSortFailure.bind(this);
 		const sortedFolderItems = function (
 			this: InternalExplorerView,
 			...arguments_: unknown[]
 		): unknown {
-			const result: unknown = Reflect.apply(original, this, arguments_);
-			return sortFolderItems(result, arguments_[0], getOptions);
+			try {
+				const result: unknown = Reflect.apply(original, this, arguments_);
+				return sortFolderItems(result, arguments_[0], getOptions);
+			} catch {
+				return handleSortFailure(arguments_[0]);
+			}
 		};
 
-		this.view.getSortedFolderItems = sortedFolderItems;
+		try {
+			this.view.getSortedFolderItems = sortedFolderItems;
+		} catch {
+			this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
+			return null;
+		}
 		return () => {
 			if (this.view.getSortedFolderItems === sortedFolderItems) {
 				this.view.getSortedFolderItems = original;
@@ -356,6 +366,13 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			const path = value.file.path;
 			return typeof path === 'string' ? [{ path, value }] : [];
 		});
+	}
+
+	private handleSortFailure(folder: unknown): unknown[] {
+		this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
+		return isRecord(folder) && isUnknownArray(folder.children)
+			? [...folder.children]
+			: [];
 	}
 
 	private sortFolderItems(

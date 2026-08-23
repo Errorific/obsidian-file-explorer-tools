@@ -4,6 +4,7 @@ import {
 	type FileExplorerToolsSettings,
 	prepareSettings,
 } from './settings';
+import { applyDelete, applyRename } from './settings-events';
 import { registerFolderSortMenu } from './sorting/folder-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
@@ -28,6 +29,20 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			callback: () => this.explorerController?.toggleForceGlobal(),
 		});
 		registerFolderSortMenu(this);
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				if (applyRename(this.settings, oldPath, file.path)) {
+					void this.saveSettings();
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (applyDelete(this.settings, file.path)) {
+					void this.saveSettings();
+				}
+			}),
+		);
 		this.explorerController.start();
 	}
 

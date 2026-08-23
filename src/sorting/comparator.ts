@@ -39,7 +39,7 @@ export function compareExplorerItems(
 		return modeComparison;
 	}
 
-	return compareText(left.path, right.path);
+	return comparePaths(left.path, right.path);
 }
 
 function comparePrefixPositions(
@@ -109,6 +109,14 @@ function compareNumbers(left: number | null, right: number | null): number {
 
 function compareText(left: string, right: string): number {
 	return NAME_COMPARER.compare(left, right);
+}
+
+function comparePaths(left: string, right: string): number {
+	const localizedComparison = compareText(left, right);
+	if (localizedComparison !== 0) {
+		return localizedComparison;
+	}
+	return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function isTimeMode(mode: SortMode): boolean {
