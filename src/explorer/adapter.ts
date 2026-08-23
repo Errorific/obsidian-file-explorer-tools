@@ -445,16 +445,17 @@ function readSortItem(value: unknown): ExplorerSortItem | null {
 		return null;
 	}
 
-	const path = readPath(value);
+	const file = isRecord(value.file) ? value.file : value;
+	const path = readPath(file);
 	if (path === null) {
 		return null;
 	}
 
-	const folder = Array.isArray(value.children);
-	const stat = isRecord(value.stat) ? value.stat : null;
+	const folder = Array.isArray(file.children);
+	const stat = isRecord(file.stat) ? file.stat : null;
 	return {
 		path,
-		name: typeof value.name === 'string' ? value.name : nameOf(path),
+		name: typeof file.name === 'string' ? file.name : nameOf(path),
 		folder,
 		createdAt: folder ? null : readTimestamp(stat?.ctime),
 		modifiedAt: folder ? null : readTimestamp(stat?.mtime),

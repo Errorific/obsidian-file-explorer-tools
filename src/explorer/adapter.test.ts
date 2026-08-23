@@ -142,9 +142,8 @@ describe('createExplorerAdapter', () => {
 		expect(adapter.scrollTo('Welcome.md')).toBe(false);
 	});
 
-	it('sorts underlying folder children with configured rules', () => {
+	it('sorts explorer item wrappers using their underlying vault items', () => {
 		const { view } = createView();
-		const adapter = createExplorerAdapter(view);
 		const folder = {
 			path: 'Projects',
 			children: [
@@ -165,6 +164,9 @@ describe('createExplorerAdapter', () => {
 				},
 			],
 		};
+		const wrappers = folder.children.map((file) => ({ file }));
+		view.getSortedFolderItems.mockImplementation(() => wrappers);
+		const adapter = createExplorerAdapter(view);
 
 		const dispose = adapter.installSorting(() => ({
 			groupFoldersFirst: false,
@@ -173,13 +175,13 @@ describe('createExplorerAdapter', () => {
 		}));
 
 		expect(view.getSortedFolderItems(folder)).toEqual([
-			folder.children[2],
-			folder.children[0],
-			folder.children[1],
+			wrappers[2],
+			wrappers[0],
+			wrappers[1],
 		]);
 
 		dispose?.();
-		expect(view.getSortedFolderItems(folder)).toEqual(folder.children);
+		expect(view.getSortedFolderItems(folder)).toEqual(wrappers);
 	});
 
 	it('falls back to folder children when native child sorting fails', () => {
