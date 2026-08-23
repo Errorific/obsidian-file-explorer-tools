@@ -84,6 +84,7 @@ export function createExplorerAdapter(
 class ObsidianExplorerAdapter implements ExplorerAdapter {
 	private readonly originalSort: UnknownFunction | null;
 	private readonly failedCapabilities = new Set<string>();
+	private readonly toolbarUpdates = new Set<() => void>();
 
 	constructor(
 		private readonly view: InternalExplorerView,
@@ -99,17 +100,27 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}
 
 		try {
+			const callback = () => {
+				action.callback();
+				updatePressedState(element, action.getPressed);
+			};
 			const element = registration.add.call(
 				registration.receiver,
 				action.icon,
 				action.title,
-				action.callback,
+				callback,
 			);
 			if (!isRemovable(element)) {
 				this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 				return null;
 			}
-			return () => element.remove();
+			const update = () => updatePressedState(element, action.getPressed);
+			update();
+			this.toolbarUpdates.add(update);
+			return () => {
+				this.toolbarUpdates.delete(update);
+				element.remove();
+			};
 		} catch {
 			this.failedCapabilities.add(CAPABILITY_LABELS.toolbar);
 			return null;
@@ -238,6 +249,12 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		} catch {
 			this.failedCapabilities.add(CAPABILITY_LABELS.renders);
 			return null;
+		}
+	}
+
+	refreshToolbarActions(): void {
+		for (const update of this.toolbarUpdates) {
+			update();
 		}
 	}
 
@@ -469,6 +486,24 @@ function isUnknownArray(value: unknown): value is unknown[] {
 
 function isRemovable(value: unknown): value is { remove(): void } {
 	return isRecord(value) && typeof value.remove === 'function';
+}
+
+function updatePressedState(
+	element: unknown,
+	getPressed: (() => boolean) | undefined,
+): void {
+	if (
+		getPressed === undefined ||
+		!isRecord(element) ||
+		typeof element.setAttribute !== 'function'
+	) {
+		return;
+	}
+
+	Reflect.apply(element.setAttribute, element, [
+		'aria-pressed',
+		String(getPressed()),
+	]);
 }
 
 function readFunction(value: unknown): UnknownFunction | null {

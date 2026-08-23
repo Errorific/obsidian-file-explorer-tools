@@ -29,6 +29,7 @@ function createAdapter() {
 		getSortMode,
 		installSorting: vi.fn(() => vi.fn()),
 		observeRenders: vi.fn(() => vi.fn()),
+		refreshToolbarActions: vi.fn(),
 		runOriginalSort,
 		scrollTo: vi.fn(() => true),
 		select: vi.fn(() => true),

@@ -20,9 +20,19 @@ function createView() {
 		}),
 	};
 	const selected = new Set<FakeItem>();
-	const toolbarElement = { remove: vi.fn() };
+	const toolbarElement = { remove: vi.fn(), setAttribute: vi.fn() };
+	let toolbarCallback: ((event: MouseEvent) => unknown) | null = null;
 	const view = {
-		addAction: vi.fn(() => toolbarElement),
+		addAction: vi.fn(
+			(
+				_icon: string,
+				_title: string,
+				callback: (event: MouseEvent) => unknown,
+			) => {
+				toolbarCallback = callback;
+				return toolbarElement;
+			},
+		),
 		fileItems: {
 			'Welcome.md': fileItem,
 			Projects: folderItem,
@@ -44,7 +54,14 @@ function createView() {
 		},
 	};
 
-	return { fileItem, folderItem, selected, toolbarElement, view };
+	return {
+		fileItem,
+		folderItem,
+		selected,
+		toolbarElement,
+		triggerToolbar: () => toolbarCallback?.({} as MouseEvent),
+		view,
+	};
 }
 
 function createObserverFactory() {
@@ -252,7 +269,7 @@ describe('createExplorerAdapter', () => {
 	});
 
 	it('adds and removes toolbar actions', () => {
-		const { toolbarElement, view } = createView();
+		const { toolbarElement, triggerToolbar, view } = createView();
 		const adapter = createExplorerAdapter(view);
 		const callback = vi.fn();
 
@@ -265,10 +282,37 @@ describe('createExplorerAdapter', () => {
 		expect(view.addAction).toHaveBeenCalledWith(
 			'wrench',
 			'Check compatibility',
-			callback,
+			expect.any(Function),
 		);
+		triggerToolbar();
+		expect(callback).toHaveBeenCalledOnce();
 		dispose?.();
 		expect(toolbarElement.remove).toHaveBeenCalledOnce();
+	});
+
+	it('updates pressed state for toolbar toggles', () => {
+		const { toolbarElement, triggerToolbar, view } = createView();
+		const adapter = createExplorerAdapter(view);
+		let pressed = false;
+
+		adapter.addToolbarAction({
+			icon: 'list-ordered',
+			title: 'Toggle force global sorting',
+			callback: () => {
+				pressed = !pressed;
+			},
+			getPressed: () => pressed,
+		});
+
+		expect(toolbarElement.setAttribute).toHaveBeenCalledWith(
+			'aria-pressed',
+			'false',
+		);
+		triggerToolbar();
+		expect(toolbarElement.setAttribute).toHaveBeenLastCalledWith(
+			'aria-pressed',
+			'true',
+		);
 	});
 
 	it('rejects toolbar actions without a removable element', () => {
@@ -309,7 +353,7 @@ describe('createExplorerAdapter', () => {
 		expect(addNavButton).toHaveBeenCalledWith(
 			'wrench',
 			'Check compatibility',
-			callback,
+			expect.any(Function),
 		);
 		dispose?.();
 		expect(toolbarElement.remove).toHaveBeenCalledOnce();

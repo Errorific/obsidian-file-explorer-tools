@@ -93,6 +93,9 @@ export class ExplorerController {
 
 	toggleForceGlobal(): void {
 		this.forceGlobal = !this.forceGlobal;
+		for (const { adapter } of this.attachedLeaves.values()) {
+			adapter.refreshToolbarActions();
+		}
 		this.refreshSorting();
 	}
 
@@ -165,6 +168,7 @@ export class ExplorerController {
 				icon: 'list-ordered',
 				title: 'Toggle force global sorting',
 				callback: () => this.toggleForceGlobal(),
+				getPressed: () => this.forceGlobal,
 			});
 			if (disposeForceGlobalAction !== null) {
 				disposers.push(disposeForceGlobalAction);

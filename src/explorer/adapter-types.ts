@@ -29,6 +29,7 @@ export interface ToolbarAction {
 	icon: string;
 	title: string;
 	callback: () => void;
+	getPressed?: () => boolean;
 }
 
 export type SortingOptionsProvider = (
@@ -45,6 +46,7 @@ export interface ExplorerAdapter {
 	getSortMode(): CoreSortMode | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	observeRenders(callback: () => void): (() => void) | null;
+	refreshToolbarActions(): void;
 	runOriginalSort(): boolean;
 	scrollTo(path: string): boolean;
 	select(path: string): boolean;
