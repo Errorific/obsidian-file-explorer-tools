@@ -1,9 +1,11 @@
+import { compareExplorerItems, type ExplorerSortItem } from '../sorting/comparator';
 import {
 	CORE_SORT_MODES,
 	type CoreSortMode,
 	type ExplorerAdapter,
 	type ExplorerCompatibilityReport,
 	type ExplorerItemSnapshot,
+	type SortingOptionsProvider,
 	type ToolbarAction,
 } from './adapter-types';
 
@@ -42,6 +44,7 @@ interface InternalExplorerView {
 		callback: (event: MouseEvent) => unknown,
 	) => unknown;
 	fileItems?: unknown;
+	getSortedFolderItems?: UnknownFunction;
 	headerDom?: InternalExplorerHeader;
 	navFileContainerEl?: Node;
 	sort?: UnknownFunction;
@@ -63,6 +66,7 @@ const CAPABILITY_LABELS = {
 	renders: 'observe explorer renders',
 	sortMode: 'read core sort mode',
 	sort: 'run core sorting',
+	customSort: 'apply custom sorting',
 	collapse: 'expand and collapse folders',
 	select: 'select items',
 	scroll: 'scroll to items',
@@ -147,6 +151,11 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		);
 		this.addUnavailable(
 			unavailableCapabilities,
+			CAPABILITY_LABELS.customSort,
+			typeof this.view.getSortedFolderItems !== 'function',
+		);
+		this.addUnavailable(
+			unavailableCapabilities,
 			CAPABILITY_LABELS.collapse,
 			!hasFolderControls(items),
 		);
@@ -191,6 +200,29 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 
 	getSortMode(): CoreSortMode | null {
 		return isCoreSortMode(this.view.sortOrder) ? this.view.sortOrder : null;
+	}
+
+	installSorting(getOptions: SortingOptionsProvider): (() => void) | null {
+		const original = this.view.getSortedFolderItems;
+		if (typeof original !== 'function') {
+			return null;
+		}
+
+		const sortFolderItems = this.sortFolderItems.bind(this);
+		const sortedFolderItems = function (
+			this: InternalExplorerView,
+			...arguments_: unknown[]
+		): unknown {
+			const result: unknown = Reflect.apply(original, this, arguments_);
+			return sortFolderItems(result, arguments_[0], getOptions);
+		};
+
+		this.view.getSortedFolderItems = sortedFolderItems;
+		return () => {
+			if (this.view.getSortedFolderItems === sortedFolderItems) {
+				this.view.getSortedFolderItems = original;
+			}
+		};
 	}
 
 	observeRenders(callback: () => void): (() => void) | null {
@@ -309,6 +341,39 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		});
 	}
 
+	private sortFolderItems(
+		result: unknown,
+		folder: unknown,
+		getOptions: SortingOptionsProvider,
+	): unknown {
+		const coreSortMode = this.getSortMode();
+		const folderPath = readPath(folder);
+		if (!isUnknownArray(result) || coreSortMode === null || folderPath === null) {
+			return result;
+		}
+
+		const items = result.map(readSortItem);
+		if (items.some((item) => item === null)) {
+			return result;
+		}
+
+		try {
+			const options = getOptions(folderPath, coreSortMode);
+			return result
+				.map((value, index) => ({
+					item: items[index] as ExplorerSortItem,
+					value,
+				}))
+				.sort((left, right) =>
+					compareExplorerItems(left.item, right.item, options),
+				)
+				.map(({ value }) => value);
+		} catch {
+			this.failedCapabilities.add(CAPABILITY_LABELS.customSort);
+			return result;
+		}
+	}
+
 	private setCollapsed(path: string, collapsed: boolean): boolean {
 		const item = this.findItem(path);
 		if (item === null || typeof item.setCollapsed !== 'function') {
@@ -323,6 +388,40 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			return false;
 		}
 	}
+}
+
+function readSortItem(value: unknown): ExplorerSortItem | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const path = readPath(value);
+	if (path === null) {
+		return null;
+	}
+
+	const folder = Array.isArray(value.children);
+	const stat = isRecord(value.stat) ? value.stat : null;
+	return {
+		path,
+		name: typeof value.name === 'string' ? value.name : nameOf(path),
+		folder,
+		createdAt: folder ? null : readTimestamp(stat?.ctime),
+		modifiedAt: folder ? null : readTimestamp(stat?.mtime),
+	};
+}
+
+function readPath(value: unknown): string | null {
+	return isRecord(value) && typeof value.path === 'string' ? value.path : null;
+}
+
+function readTimestamp(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function nameOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? path : path.slice(separatorIndex + 1);
 }
 
 function asExplorerView(value: unknown): InternalExplorerView {
@@ -362,6 +461,10 @@ function isNode(value: unknown): value is Node {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+	return Array.isArray(value);
 }
 
 function isRemovable(value: unknown): value is { remove(): void } {

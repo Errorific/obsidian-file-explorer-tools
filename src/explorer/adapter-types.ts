@@ -1,3 +1,5 @@
+import type { SortingOptions } from '../sorting/comparator';
+
 export const CORE_SORT_MODES = [
 	'alphabetical',
 	'alphabeticalReverse',
@@ -29,6 +31,11 @@ export interface ToolbarAction {
 	callback: () => void;
 }
 
+export type SortingOptionsProvider = (
+	folderPath: string,
+	coreSortMode: CoreSortMode,
+) => SortingOptions;
+
 export interface ExplorerAdapter {
 	addToolbarAction(action: ToolbarAction): (() => void) | null;
 	collapse(path: string): boolean;
@@ -36,6 +43,7 @@ export interface ExplorerAdapter {
 	getCompatibilityReport(): ExplorerCompatibilityReport;
 	getItems(): ExplorerItemSnapshot[];
 	getSortMode(): CoreSortMode | null;
+	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	observeRenders(callback: () => void): (() => void) | null;
 	runOriginalSort(): boolean;
 	scrollTo(path: string): boolean;

@@ -25,6 +25,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		getCompatibilityReport,
 		getItems: vi.fn(() => []),
 		getSortMode,
+		installSorting: vi.fn(() => vi.fn()),
 		observeRenders: vi.fn(() => disposeObserver),
 		runOriginalSort: vi.fn(() => true),
 		scrollTo: vi.fn(() => true),

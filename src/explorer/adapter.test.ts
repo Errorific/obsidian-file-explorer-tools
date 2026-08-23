@@ -27,6 +27,9 @@ function createView() {
 			'Welcome.md': fileItem,
 			Projects: folderItem,
 		},
+		getSortedFolderItems: vi.fn(
+			(folder: { path?: string; children: unknown[] }) => [...folder.children],
+		),
 		navFileContainerEl: { nodeType: 1 },
 		sort: vi.fn(),
 		sortOrder: 'alphabetical',
@@ -105,6 +108,7 @@ describe('createExplorerAdapter', () => {
 				'observe explorer renders',
 				'read core sort mode',
 				'run core sorting',
+				'apply custom sorting',
 				'expand and collapse folders',
 				'select items',
 				'scroll to items',
@@ -119,6 +123,58 @@ describe('createExplorerAdapter', () => {
 		expect(adapter.collapse('Projects')).toBe(false);
 		expect(adapter.select('Welcome.md')).toBe(false);
 		expect(adapter.scrollTo('Welcome.md')).toBe(false);
+	});
+
+	it('sorts underlying folder children with configured rules', () => {
+		const { view } = createView();
+		const adapter = createExplorerAdapter(view);
+		const folder = {
+			path: 'Projects',
+			children: [
+				{
+					path: 'Projects/Alpha.md',
+					name: 'Alpha.md',
+					stat: { ctime: 10, mtime: 10 },
+				},
+				{
+					path: 'Projects/Folder',
+					name: 'Folder',
+					children: [],
+				},
+				{
+					path: 'Projects/Zulu.md',
+					name: 'Zulu.md',
+					stat: { ctime: 20, mtime: 20 },
+				},
+			],
+		};
+
+		const dispose = adapter.installSorting(() => ({
+			groupFoldersFirst: false,
+			prefixPositions: new Map([['Zulu.md', 0]]),
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems(folder)).toEqual([
+			folder.children[2],
+			folder.children[0],
+			folder.children[1],
+		]);
+
+		dispose?.();
+		expect(view.getSortedFolderItems(folder)).toEqual(folder.children);
+	});
+
+	it('leaves native results unchanged when sorting metadata is unavailable', () => {
+		const { view } = createView();
+		const adapter = createExplorerAdapter(view);
+		const children = [{ name: 'Missing path' }];
+		adapter.installSorting(() => ({
+			groupFoldersFirst: false,
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems({ path: '', children })).toEqual(children);
 	});
 
 	it('runs the sort implementation captured during attachment', () => {
