@@ -18,6 +18,11 @@ export interface ExplorerItemSnapshot {
 	selected: boolean;
 }
 
+export interface ItemVisibility {
+	hidden: boolean;
+	showHidden: boolean;
+}
+
 export interface ExplorerCompatibilityReport {
 	available: boolean;
 	unavailableCapabilities: string[];
@@ -43,6 +48,7 @@ export interface ExplorerAdapter {
 	expand(path: string): boolean;
 	getCompatibilityReport(): ExplorerCompatibilityReport;
 	getItems(): ExplorerItemSnapshot[];
+	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	observeRenders(callback: () => void): (() => void) | null;

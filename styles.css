@@ -6,3 +6,15 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+.file-explorer-tools-hidden {
+	display: none;
+}
+
+.file-explorer-tools-hidden-revealed {
+	opacity: 0.55;
+}
+
+.file-explorer-tools-hidden-revealed::after {
+	content: ' (hidden)';
+	color: var(--text-muted);
+}

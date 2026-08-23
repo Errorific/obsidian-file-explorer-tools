@@ -41,6 +41,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		expand: vi.fn(() => true),
 		getCompatibilityReport,
 		getItems: vi.fn(() => []),
+		setItemVisibility: vi.fn(() => true),
 		getSortMode,
 		installSorting,
 		observeRenders: vi.fn(() => disposeObserver),
@@ -64,6 +65,7 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 	let leaves = initialLeaves;
 	let layoutReadyCallback: (() => void) | null = null;
 	let layoutChangeCallback: (() => void) | null = null;
+	let fileOpenCallback: (() => void) | null = null;
 	const getLeavesOfType = vi.fn(() => leaves);
 	const onLayoutChange = vi.fn(
 		(_name: 'layout-change', callback: () => void) => {
@@ -74,12 +76,21 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 	const onLayoutReady = vi.fn((callback: () => void) => {
 		layoutReadyCallback = callback;
 	});
+	const onFileOpen = vi.fn(
+		(_name: 'file-open', callback: () => void) => {
+			fileOpenCallback = callback;
+			return {};
+		},
+	);
 	const registerEvent = vi.fn();
 	const host: ExplorerPluginHost = {
 		app: {
 			workspace: {
 				getLeavesOfType,
-				on: onLayoutChange,
+				on: (name: 'layout-change' | 'file-open', callback: () => void) =>
+					name === 'layout-change'
+						? onLayoutChange(name, callback)
+						: onFileOpen(name, callback),
 				onLayoutReady,
 			},
 		},
@@ -92,6 +103,7 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 			leaves = nextLeaves;
 		},
 		triggerLayoutChange: () => layoutChangeCallback?.(),
+		triggerFileOpen: () => fileOpenCallback?.(),
 		triggerLayoutReady: () => layoutReadyCallback?.(),
 	};
 }
@@ -113,10 +125,10 @@ describe('ExplorerController', () => {
 
 		expect(createAdapterForView).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledWith(leaf.view);
-		expect(registerEvent).toHaveBeenCalledOnce();
+		expect(registerEvent).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(disposeToolbar).toHaveBeenCalledTimes(2);
+		expect(disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -141,12 +153,12 @@ describe('ExplorerController', () => {
 		setLeaves([secondLeaf]);
 		triggerLayoutChange();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(2);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(2);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -173,7 +185,7 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(2);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 		expect(showNotice).toHaveBeenCalledWith(
@@ -181,7 +193,7 @@ describe('ExplorerController', () => {
 		);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(2);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -244,8 +256,8 @@ describe('ExplorerController', () => {
 
 		controller.start();
 		triggerLayoutReady();
-		expect(first.actions).toHaveLength(2);
-		first.actions[1]?.callback();
+		expect(first.actions).toHaveLength(3);
+		first.actions[2]?.callback();
 
 		expect(controller.isForceGlobal()).toBe(true);
 		expect(first.runOriginalSort).toHaveBeenCalledTimes(2);

@@ -5,6 +5,7 @@ import {
 	type ExplorerAdapter,
 	type ExplorerCompatibilityReport,
 	type ExplorerItemSnapshot,
+	type ItemVisibility,
 	type SortingOptionsProvider,
 	type ToolbarAction,
 } from './adapter-types';
@@ -13,6 +14,7 @@ type UnknownFunction = (...arguments_: unknown[]) => unknown;
 
 interface InternalExplorerItem {
 	collapsed?: unknown;
+	el?: unknown;
 	file?: { path?: unknown };
 	setCollapsed?: UnknownFunction;
 }
@@ -212,6 +214,36 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 					: null,
 			selected: this.view.tree?.selectedDoms?.has?.(item.value) ?? false,
 		}));
+	}
+
+	setItemVisibility(path: string, visibility: ItemVisibility): boolean {
+		const item = this.findItem(path);
+		const element = readItemElement(item);
+		if (element === null) {
+			return false;
+		}
+
+		try {
+			if (visibility.hidden && !visibility.showHidden) {
+				element.classList.add('file-explorer-tools-hidden');
+			} else {
+				element.classList.remove('file-explorer-tools-hidden');
+			}
+			element.classList.toggle(
+				'file-explorer-tools-hidden-revealed',
+				visibility.hidden && visibility.showHidden,
+			);
+			if (visibility.hidden) {
+				element.setAttribute('aria-hidden', String(!visibility.showHidden));
+				element.setAttribute('data-file-explorer-tools-hidden', 'true');
+			} else {
+				element.removeAttribute('aria-hidden');
+				element.removeAttribute('data-file-explorer-tools-hidden');
+			}
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	getSortMode(): CoreSortMode | null {
@@ -415,6 +447,33 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			return false;
 		}
 	}
+}
+
+function readItemElement(
+	item: InternalExplorerItem | null,
+): {
+	classList: DOMTokenList;
+	setAttribute(name: string, value: string): void;
+	removeAttribute(name: string): void;
+} | null {
+	if (!isRecord(item?.el) || !isRecord(item.el.classList)) {
+		return null;
+	}
+	const classList = item.el.classList;
+	if (
+		typeof classList.add !== 'function' ||
+		typeof classList.remove !== 'function' ||
+		typeof classList.toggle !== 'function' ||
+		typeof item.el.setAttribute !== 'function' ||
+		typeof item.el.removeAttribute !== 'function'
+	) {
+		return null;
+	}
+	return item.el as {
+		classList: DOMTokenList;
+		setAttribute(name: string, value: string): void;
+		removeAttribute(name: string): void;
+	};
 }
 
 function readSortItem(value: unknown): ExplorerSortItem | null {

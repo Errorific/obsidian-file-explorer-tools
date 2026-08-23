@@ -1,5 +1,7 @@
 import type { EventRef } from 'obsidian';
 import { DEFAULT_SETTINGS, type FileExplorerToolsSettings } from '../settings';
+import { isHidden, pathsToReveal } from '../hiding/hidden-items';
+import { createLeafState, resetTemporaryVisibility, type ExplorerLeafState } from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
 import { createExplorerAdapter } from './adapter';
 import type { ExplorerAdapter } from './adapter-types';
@@ -18,6 +20,7 @@ export interface ExplorerPluginHost {
 		workspace: {
 			getLeavesOfType(viewType: string): ExplorerLeaf[];
 			on(name: 'layout-change', callback: () => void): EventRef;
+			on(name: 'file-open', callback: () => void): EventRef;
 			onLayoutReady(callback: () => void): void;
 		};
 	};
@@ -32,6 +35,7 @@ export interface ExplorerControllerOptions {
 
 interface AttachedExplorer {
 	adapter: ExplorerAdapter;
+	state: ExplorerLeafState;
 	dispose: () => void;
 }
 
@@ -70,6 +74,14 @@ export class ExplorerController {
 					this.attachExplorerLeaves();
 				}),
 			);
+			this.plugin.registerEvent(
+				this.plugin.app.workspace.on('file-open', () => {
+					for (const attached of this.attachedLeaves.values()) {
+						resetTemporaryVisibility(attached.state);
+						this.applyVisibility(attached);
+					}
+				}),
+			);
 		});
 	}
 
@@ -86,8 +98,15 @@ export class ExplorerController {
 	}
 
 	refreshSorting(): void {
-		for (const { adapter } of this.attachedLeaves.values()) {
-			adapter.runOriginalSort();
+		for (const attached of this.attachedLeaves.values()) {
+			attached.adapter.runOriginalSort();
+			this.applyVisibility(attached);
+		}
+	}
+
+	refreshVisibility(): void {
+		for (const attached of this.attachedLeaves.values()) {
+			this.applyVisibility(attached);
 		}
 	}
 
@@ -122,18 +141,21 @@ export class ExplorerController {
 
 			try {
 				const adapter = this.createAdapter(leaf.view);
-				this.attachedLeaves.set(leaf, {
-					adapter,
-					dispose: this.attachLeaf(adapter),
-				});
+				const attached = this.attachLeaf(adapter);
+				this.attachedLeaves.set(leaf, attached);
 			} catch {
 				runSafely(() => this.showNotice(ATTACHMENT_FAILURE_MESSAGE));
 			}
 		}
 	}
 
-	private attachLeaf(adapter: ExplorerAdapter): () => void {
+	private attachLeaf(adapter: ExplorerAdapter): AttachedExplorer {
 		const disposers: Array<() => void> = [];
+		const attached: AttachedExplorer = {
+			adapter,
+			state: createLeafState(),
+			dispose: () => runDisposers(disposers),
+		};
 		try {
 			const disposeSorting = adapter.installSorting((folderPath, coreSortMode) =>
 				createSortingOptions(
@@ -150,6 +172,7 @@ export class ExplorerController {
 			let renderCount = 0;
 			const disposeRenderObserver = adapter.observeRenders(() => {
 				renderCount += 1;
+				this.applyVisibility(attached);
 			});
 			if (disposeRenderObserver !== null) {
 				disposers.push(disposeRenderObserver);
@@ -164,6 +187,21 @@ export class ExplorerController {
 				disposers.push(disposeToolbarAction);
 			}
 
+			const disposeRevealAction = adapter.addToolbarAction({
+				icon: 'eye-off',
+				title: 'Toggle hidden items',
+				callback: () => {
+					attached.state.showHidden = !attached.state.showHidden;
+					resetTemporaryVisibility(attached.state);
+					this.applyVisibility(attached);
+					adapter.refreshToolbarActions();
+				},
+				getPressed: () => attached.state.showHidden,
+			});
+			if (disposeRevealAction !== null) {
+				disposers.push(disposeRevealAction);
+			}
+
 			const disposeForceGlobalAction = adapter.addToolbarAction({
 				icon: 'list-ordered',
 				title: 'Toggle force global sorting',
@@ -175,6 +213,7 @@ export class ExplorerController {
 			}
 
 			adapter.runOriginalSort();
+			this.applyVisibility(attached);
 			const report = adapter.getCompatibilityReport();
 			if (!report.available) {
 				runSafely(() =>
@@ -186,7 +225,30 @@ export class ExplorerController {
 			throw error;
 		}
 
-		return () => runDisposers(disposers);
+		return attached;
+	}
+
+	private applyVisibility(attached: AttachedExplorer): void {
+		const settings = this.getSettings();
+		for (const item of attached.adapter.getItems()) {
+			const hidden = isHidden(settings, item.path);
+			const showHidden =
+				attached.state.showHidden ||
+				attached.state.temporaryVisiblePaths.has(item.path);
+			attached.adapter.setItemVisibility(item.path, { hidden, showHidden });
+		}
+	}
+
+	revealPath(path: string, leaf?: ExplorerLeaf): void {
+		for (const [candidate, attached] of this.attachedLeaves) {
+			if (leaf !== undefined && candidate !== leaf) {
+				continue;
+			}
+			for (const revealed of pathsToReveal(path, this.getSettings())) {
+				attached.state.temporaryVisiblePaths.add(revealed);
+			}
+			this.applyVisibility(attached);
+		}
 	}
 }
 
