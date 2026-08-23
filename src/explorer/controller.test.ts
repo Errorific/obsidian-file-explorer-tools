@@ -277,6 +277,39 @@ describe('ExplorerController', () => {
 		expect(second.runOriginalSort).toHaveBeenCalledOnce();
 	});
 
+	it('keeps the open hidden file visible when reveal mode is toggled', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const hiddenSettings = { ...settings, hiddenPaths: ['Private.md'] };
+		const setItemVisibility = vi.fn(() => true);
+		const { adapter, actions } = createAdapter({
+			getItems: vi.fn(() => [
+				{
+					path: 'Private.md',
+					folder: false,
+					collapsed: null,
+					selected: true,
+				},
+			]),
+			setItemVisibility,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => hiddenSettings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.revealPath('Private.md');
+		actions[1]?.callback();
+
+		expect(setItemVisibility).toHaveBeenLastCalledWith('Private.md', {
+			hidden: true,
+			showHidden: true,
+		});
+	});
+
 	it('reapplies sorting when settings change', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);

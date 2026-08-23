@@ -75,7 +75,7 @@ Reveal-hidden state resets when Obsidian restarts and is independent for each fi
 
 Hiding an ordered-prefix item retains its stored position. A hidden folder and its descendants retain independent hidden states.
 
-Locating a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes, reveal-hidden mode changes for that explorer leaf, or the plugin unloads. Moving focus to another pane without changing the active file does not conceal the located path.
+Locating or opening a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes or the plugin unloads. Moving focus to another pane, or changing reveal-hidden mode, does not conceal the active file's path.
 
 ### Sorting
 

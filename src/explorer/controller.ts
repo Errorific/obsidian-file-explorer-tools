@@ -200,7 +200,6 @@ export class ExplorerController {
 				title: 'Toggle hidden items',
 				callback: () => {
 					attached.state.showHidden = !attached.state.showHidden;
-					resetTemporaryVisibility(attached.state);
 					this.applyVisibility(attached);
 					adapter.refreshToolbarActions();
 				},
