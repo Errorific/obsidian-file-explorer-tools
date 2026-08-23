@@ -398,6 +398,8 @@ The compatibility probe established the following implementation details. They r
 
 ### Phase 3: Sorting engine
 
+Status: Implemented and manually verified against Obsidian 1.13.7.
+
 - Implement and comprehensively test pure comparators
 - Add mixed and folders-first behavior
 - Add per-folder overrides
@@ -466,6 +468,8 @@ Pure functionality should be tested without an Obsidian runtime wherever possibl
 - Folder Notes path mapping
 
 Explorer adapter tests should use narrow fakes matching the undocumented structures the adapter expects. Manual tests in the linked vault are still required for DOM behavior, toolbar placement, explorer rerenders, native drag and drop, and compatibility with Folder Notes.
+
+Obsidian 1.13.7 exposes the core file explorer as a singleton through its user interface. Multi-leaf controller behavior is covered with adapter tests, but cannot be reproduced through a supported manual layout.
 
 Test output must be clean. Expected errors from compatibility tests must be captured and asserted.
 
