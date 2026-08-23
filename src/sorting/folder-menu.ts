@@ -1,4 +1,4 @@
-import type { EventRef, Menu, TAbstractFile } from 'obsidian';
+import type { EventRef, Menu, MenuItem, TAbstractFile } from 'obsidian';
 import type { FileExplorerToolsSettings, SortMode } from '../settings';
 
 interface FolderSortMenuHost {
@@ -19,13 +19,13 @@ const SORT_CHOICES: ReadonlyArray<{
 	mode: SortMode | undefined;
 	title: string;
 }> = [
-	{ mode: undefined, title: 'Use global sort' },
-	{ mode: 'name-ascending', title: 'Sort folder: Name (A to Z)' },
-	{ mode: 'name-descending', title: 'Sort folder: Name (Z to A)' },
-	{ mode: 'modified-descending', title: 'Sort folder: Modified (newest)' },
-	{ mode: 'modified-ascending', title: 'Sort folder: Modified (oldest)' },
-	{ mode: 'created-descending', title: 'Sort folder: Created (newest)' },
-	{ mode: 'created-ascending', title: 'Sort folder: Created (oldest)' },
+	{ mode: undefined, title: 'Use global' },
+	{ mode: 'name-ascending', title: 'Name (A to Z)' },
+	{ mode: 'name-descending', title: 'Name (Z to A)' },
+	{ mode: 'modified-descending', title: 'Modified (newest)' },
+	{ mode: 'modified-ascending', title: 'Modified (oldest)' },
+	{ mode: 'created-descending', title: 'Created (newest)' },
+	{ mode: 'created-ascending', title: 'Created (oldest)' },
 ];
 
 export function registerFolderSortMenu(host: FolderSortMenuHost): void {
@@ -35,21 +35,67 @@ export function registerFolderSortMenu(host: FolderSortMenuHost): void {
 				return;
 			}
 
-			const configuredMode = host.settings.folders[file.path]?.sortMode;
-			for (const choice of SORT_CHOICES) {
-				menu.addItem((item) => {
-					item
-						.setTitle(choice.title)
-						.setChecked(configuredMode === choice.mode)
-						.setSection('file-explorer-tools-sort')
-						.onClick(async () => {
-							setFolderSortMode(host.settings, file.path, choice.mode);
-							await host.saveSettings();
-						});
-				});
-			}
+			addFolderSortMenu(menu, file.path, host);
 		}),
 	);
+}
+
+export function addFolderSortMenu(
+	menu: Menu,
+	folderPath: string,
+	host: Pick<FolderSortMenuHost, 'saveSettings' | 'settings'>,
+): void {
+	let submenu: Menu | null = null;
+	menu.addItem((item) => {
+		item
+			.setTitle('Sort folder')
+			.setIcon('list-ordered')
+			.setSection('file-explorer-tools-sort');
+		submenu = getSubmenu(item);
+	});
+
+	addSortChoices(submenu ?? menu, folderPath, host);
+}
+
+function addSortChoices(
+	menu: Menu,
+	folderPath: string,
+	host: Pick<FolderSortMenuHost, 'saveSettings' | 'settings'>,
+): void {
+	const configuredMode = host.settings.folders[folderPath]?.sortMode;
+	for (const choice of SORT_CHOICES) {
+		menu.addItem((item) => {
+			item
+				.setTitle(choice.title)
+				.setChecked(configuredMode === choice.mode)
+				.onClick(async () => {
+					setFolderSortMode(host.settings, folderPath, choice.mode);
+					await host.saveSettings();
+				});
+		});
+	}
+}
+
+function getSubmenu(item: MenuItem): Menu | null {
+	const value: unknown = item;
+	if (!isRecord(value) || typeof value.setSubmenu !== 'function') {
+		return null;
+	}
+
+	try {
+		const submenu: unknown = Reflect.apply(value.setSubmenu, value, []);
+		return isMenu(submenu) ? submenu : null;
+	} catch {
+		return null;
+	}
+}
+
+function isMenu(value: unknown): value is Menu {
+	return isRecord(value) && typeof value.addItem === 'function';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
 }
 
 export function setFolderSortMode(
