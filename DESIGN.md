@@ -311,7 +311,7 @@ Paths are vault-relative and migrated during rename events.
 ```ts
 interface FileExplorerToolsSettings {
 	schemaVersion: 1;
-	groupFoldersFirst: boolean;
+	mixFilesAndFolders: boolean;
 	hiddenPaths: string[];
 	folders: Record<string, FolderConfiguration>;
 }

@@ -4,7 +4,7 @@ import { createSortingOptions, mapCoreSortMode } from './order';
 
 const settings: FileExplorerToolsSettings = {
 	schemaVersion: 1,
-	groupFoldersFirst: true,
+	mixFilesAndFolders: true,
 	hiddenPaths: [],
 	folders: {
 		Projects: {
@@ -32,7 +32,7 @@ describe('createSortingOptions', () => {
 		expect(
 			createSortingOptions(settings, 'Projects', 'alphabetical', false),
 		).toEqual({
-			groupFoldersFirst: true,
+			mixFilesAndFolders: true,
 			prefixPositions: new Map([
 				['Current.md', 0],
 				['Notes.md', 1],
@@ -43,7 +43,7 @@ describe('createSortingOptions', () => {
 
 	it('uses the core mode when the folder has no override', () => {
 		expect(createSortingOptions(settings, '', 'alphabeticalReverse', false)).toEqual({
-			groupFoldersFirst: true,
+			mixFilesAndFolders: true,
 			prefixPositions: new Map(),
 			sortMode: 'name-descending',
 		});
@@ -53,7 +53,7 @@ describe('createSortingOptions', () => {
 		expect(
 			createSortingOptions(settings, 'Projects', 'alphabetical', true),
 		).toEqual({
-			groupFoldersFirst: true,
+			mixFilesAndFolders: true,
 			prefixPositions: new Map(),
 			sortMode: 'name-ascending',
 		});

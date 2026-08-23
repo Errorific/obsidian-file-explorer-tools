@@ -9,7 +9,7 @@ import {
 
 const settings: FileExplorerToolsSettings = {
 	schemaVersion: 1,
-	groupFoldersFirst: false,
+	mixFilesAndFolders: false,
 	hiddenPaths: [],
 	folders: {},
 };

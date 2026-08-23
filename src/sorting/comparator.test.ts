@@ -7,7 +7,7 @@ import {
 } from './comparator';
 
 const DEFAULT_OPTIONS: SortingOptions = {
-	groupFoldersFirst: false,
+	mixFilesAndFolders: false,
 	sortMode: 'name-ascending',
 };
 
@@ -52,11 +52,11 @@ describe('compareExplorerItems', () => {
 	}>([
 		{
 			mode: 'name-ascending',
-			expected: ['alpha.md', 'Folder', 'zeta.md'],
+			expected: ['Folder', 'alpha.md', 'zeta.md'],
 		},
 		{
 			mode: 'name-descending',
-			expected: ['zeta.md', 'Folder', 'alpha.md'],
+			expected: ['Folder', 'zeta.md', 'alpha.md'],
 		},
 		{
 			mode: 'modified-ascending',
@@ -84,18 +84,23 @@ describe('compareExplorerItems', () => {
 		expect(sortedPaths(items, { sortMode: mode })).toEqual(expected);
 	});
 
-	it('mixes files and folders by name when folder grouping is disabled', () => {
+	it('mixes files and folders by name when configured', () => {
 		expect(
-			sortedPaths([folder('Bravo'), file('Alpha.md'), file('Charlie.md')]),
+			sortedPaths(
+				[folder('Bravo'), file('Alpha.md'), file('Charlie.md')],
+				{ mixFilesAndFolders: true },
+			),
 		).toEqual(['Alpha.md', 'Bravo', 'Charlie.md']);
 	});
 
-	it('groups folders before files when configured', () => {
+	it('groups folders before files by default', () => {
 		expect(
-			sortedPaths(
-				[folder('Zulu'), file('Alpha.md'), folder('Bravo'), file('Able.md')],
-				{ groupFoldersFirst: true },
-			),
+			sortedPaths([
+				folder('Zulu'),
+				file('Alpha.md'),
+				folder('Bravo'),
+				file('Able.md'),
+			]),
 		).toEqual(['Bravo', 'Zulu', 'Able.md', 'Alpha.md']);
 	});
 
@@ -132,7 +137,7 @@ describe('compareExplorerItems', () => {
 					file('Recent.md', 20, 20),
 				],
 				{
-					groupFoldersFirst: true,
+					mixFilesAndFolders: false,
 					prefixPositions: new Map([['Pinned.md', 0]]),
 					sortMode: 'modified-descending',
 				},

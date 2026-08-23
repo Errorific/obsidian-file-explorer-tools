@@ -23,7 +23,7 @@ export function createSortingOptions(
 ): SortingOptions {
 	const configuration = forceGlobal ? undefined : settings.folders[folderPath];
 	return {
-		groupFoldersFirst: settings.groupFoldersFirst,
+		mixFilesAndFolders: settings.mixFilesAndFolders,
 		prefixPositions: new Map(
 			(configuration?.orderedPrefix ?? []).map((name, index) => [name, index]),
 		),

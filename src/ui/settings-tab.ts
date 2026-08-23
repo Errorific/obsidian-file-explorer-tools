@@ -17,13 +17,13 @@ export class FileExplorerToolsSettingsTab extends PluginSettingTab {
 		this.containerEl.empty();
 
 		new Setting(this.containerEl)
-			.setName('Group folders first')
-			.setDesc('Place folders before files instead of mixing them together.')
+			.setName('Mix files and folders')
+			.setDesc('Sort files and folders together by name.')
 			.addToggle((toggle) => {
 				toggle
-					.setValue(this.plugin.settings.groupFoldersFirst)
+					.setValue(this.plugin.settings.mixFilesAndFolders)
 					.onChange(async (value) => {
-						this.plugin.settings.groupFoldersFirst = value;
+						this.plugin.settings.mixFilesAndFolders = value;
 						await this.plugin.saveSettings();
 					});
 			});

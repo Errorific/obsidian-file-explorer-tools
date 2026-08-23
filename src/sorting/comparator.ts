@@ -9,7 +9,7 @@ export interface ExplorerSortItem {
 }
 
 export interface SortingOptions {
-	groupFoldersFirst: boolean;
+	mixFilesAndFolders: boolean;
 	sortMode: SortMode;
 	prefixPositions?: ReadonlyMap<string, number>;
 }
@@ -69,7 +69,7 @@ function compareTypes(
 ): number {
 	const timeMode = options.sortMode.startsWith('modified-') ||
 		options.sortMode.startsWith('created-');
-	if ((!options.groupFoldersFirst && !timeMode) || left.folder === right.folder) {
+	if ((options.mixFilesAndFolders && !timeMode) || left.folder === right.folder) {
 		return 0;
 	}
 	return left.folder ? -1 : 1;

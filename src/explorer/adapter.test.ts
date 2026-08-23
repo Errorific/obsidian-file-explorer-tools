@@ -169,7 +169,7 @@ describe('createExplorerAdapter', () => {
 		const adapter = createExplorerAdapter(view);
 
 		const dispose = adapter.installSorting(() => ({
-			groupFoldersFirst: false,
+			mixFilesAndFolders: true,
 			prefixPositions: new Map([['Zulu.md', 0]]),
 			sortMode: 'name-ascending',
 		}));
@@ -192,7 +192,7 @@ describe('createExplorerAdapter', () => {
 		const adapter = createExplorerAdapter(view);
 		const children = [{ path: 'Alpha.md' }, { path: 'Zulu.md' }];
 		adapter.installSorting(() => ({
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			sortMode: 'name-ascending',
 		}));
 
@@ -207,7 +207,7 @@ describe('createExplorerAdapter', () => {
 		const adapter = createExplorerAdapter(view);
 		const children = [{ name: 'Missing path' }];
 		adapter.installSorting(() => ({
-			groupFoldersFirst: false,
+			mixFilesAndFolders: false,
 			sortMode: 'name-ascending',
 		}));
 
