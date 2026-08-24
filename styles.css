@@ -18,7 +18,7 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--text-muted);
 	content: '';
 	filter: opacity(55%);
-	inset: -3px auto -3px 0;
+	inset: -1px auto -1px 0;
 	pointer-events: none;
 	position: absolute;
 	width: 2px;
