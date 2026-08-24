@@ -291,6 +291,38 @@ describe('createExplorerAdapter', () => {
 		);
 	});
 
+	it('updates item visibility through Folder Notes item elements', () => {
+		const { view } = createView();
+		const classes = new Set<string>();
+		const element = {
+			classList: {
+				add: (name: string) => classes.add(name),
+				remove: (name: string) => classes.delete(name),
+				toggle: (name: string, enabled: boolean) =>
+					enabled ? classes.add(name) : classes.delete(name),
+			},
+			setAttribute: vi.fn(),
+			removeAttribute: vi.fn(),
+		};
+		(view.fileItems.Projects as FakeItem & { selfEl: unknown }).selfEl = element;
+		const adapter = createExplorerAdapter(view);
+
+		expect(
+			adapter.setItemVisibility('Projects', {
+				hidden: true,
+				showHidden: true,
+				dimmed: true,
+				marked: true,
+			}),
+		).toBe(true);
+		expect(classes).toEqual(
+			new Set([
+				'file-explorer-tools-hidden-revealed',
+				'file-explorer-tools-hidden-marked',
+			]),
+		);
+	});
+
 	it('adds and removes toolbar actions', () => {
 		const { toolbarElement, triggerToolbar, view } = createView();
 		const adapter = createExplorerAdapter(view);

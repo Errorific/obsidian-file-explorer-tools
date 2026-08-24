@@ -75,7 +75,7 @@ Reveal-hidden state resets when Obsidian restarts and is independent for each fi
 
 Hiding an ordered-prefix item retains its stored position. A hidden folder and its descendants retain independent hidden states.
 
-Locating a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes, reveal-hidden mode changes for that explorer leaf, or the plugin unloads. Moving focus to another pane without changing the active file does not conceal the located path.
+Locating or opening a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes or the plugin unloads. Moving focus to another pane, or changing reveal-hidden mode, does not conceal the active file's path.
 
 ### Sorting
 
@@ -409,6 +409,8 @@ Status: Implemented and manually verified against Obsidian 1.13.7.
 
 ### Phase 4: Hiding
 
+Status: Implemented and manually verified against Obsidian 1.13.7. Multiple explorer leaves could not be manually tested because Obsidian does not expose a supported way to open more than one built-in file explorer leaf.
+
 - Add context-menu actions
 - Apply hidden state to explorer items
 - Add per-leaf reveal mode
@@ -426,6 +428,8 @@ Status: Implemented and manually verified against Obsidian 1.13.7.
 - Verify behavior with multiple explorer leaves
 
 ### Phase 6: Folder Notes integration
+
+Initial adjacent-note reveal support is implemented as part of hiding. The Folder Notes project research established that its plugin ID is `folder-notes`, its relevant settings are `folderNoteName` and `storageLocation`, and `parentFolder` notes map to `<parent path>/<folder name>`. Folder Notes explorer items may expose `selfEl` or `titleEl` rather than `el`; the explorer adapter supports all three fields. Full Folder Notes integration remains scheduled for this phase.
 
 - Read Folder Notes settings through a guarded adapter
 - Support its naming and storage modes
@@ -485,6 +489,13 @@ Every implementation phase must meet these criteria before it is considered comp
 - Relevant behavior is manually verified in the linked test vault.
 - This document is updated if implementation discoveries change an agreed contract.
 - The phase ends in a reviewable commit or pull request.
+
+## Research notes
+
+- Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
+- Folder Notes stores adjacent notes using `storageLocation: 'parentFolder'` and derives the associated folder from `folderNoteName`, commonly `{{folder_name}}`.
+- Folder Notes decorates explorer entries through `fileItems[path].selfEl` or `titleEl` and uses classes including `has-folder-note` and `is-folder-note`. File Explorer Tools preserves these classes by changing only its own classes.
+- Manual verification covered hiding, reveal styling, rerenders, vault changes, persistence, Folder Notes adjacent notes, plugin reload/disable, and console cleanliness.
 
 ## Risks and mitigations
 

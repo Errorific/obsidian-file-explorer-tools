@@ -6,6 +6,8 @@ import {
 	reconcileSettings,
 } from './settings';
 import { applyDelete, applyRename } from './settings-events';
+import { registerHiddenItemMenu } from './hiding/menu';
+import { createFolderNoteIntegration } from './integrations/folder-notes';
 import { registerFolderSortMenu } from './sorting/folder-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
@@ -29,6 +31,11 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.explorerController = new ExplorerController(this, {
 			getSettings: () => this.settings,
 			showNotice: (message) => new Notice(message),
+			folderNotes: {
+				getAssociatedFolderPath: (file) =>
+					createFolderNoteIntegration(this.app)?.getAssociatedFolderPath(file) ??
+					null,
+			},
 		});
 		this.addCommand({
 			id: 'toggle-force-global-sorting',
@@ -36,6 +43,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			callback: () => this.explorerController?.toggleForceGlobal(),
 		});
 		registerFolderSortMenu(this);
+		registerHiddenItemMenu(this);
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) {
 				return;
@@ -44,12 +52,16 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			if (JSON.stringify(reconciled) !== JSON.stringify(this.settings)) {
 				this.settings = reconciled;
 				void this.saveSettings();
+				this.explorerController?.refreshVisibility();
 			}
 		});
 		this.registerEvent(
 			this.app.vault.on('rename', (file, oldPath) => {
-				if (applyRename(this.settings, oldPath, file.path)) {
+				const changed = applyRename(this.settings, oldPath, file.path);
+				this.explorerController?.moveTemporaryVisibility(oldPath, file.path);
+				if (changed) {
 					void this.saveSettings();
+					this.explorerController?.refreshVisibility();
 				}
 			}),
 		);
@@ -57,6 +69,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			this.app.vault.on('delete', (file) => {
 				if (applyDelete(this.settings, file.path)) {
 					void this.saveSettings();
+					this.explorerController?.refreshVisibility();
 				}
 			}),
 		);

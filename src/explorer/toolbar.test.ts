@@ -26,6 +26,7 @@ function createAdapter() {
 		expand: vi.fn(() => true),
 		getCompatibilityReport,
 		getItems: vi.fn(() => []),
+		setItemVisibility: vi.fn(() => true),
 		getSortMode,
 		installSorting: vi.fn(() => vi.fn()),
 		observeRenders: vi.fn(() => vi.fn()),
