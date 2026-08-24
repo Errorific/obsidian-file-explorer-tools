@@ -11,7 +11,17 @@ If your plugin does not need CSS, delete this file.
 }
 
 .file-explorer-tools-hidden-revealed {
-	border-left: 2px solid var(--text-muted);
+	position: relative;
+}
+
+.file-explorer-tools-hidden-revealed::before {
+	background-color: var(--text-muted);
+	content: '';
+	filter: opacity(55%);
+	inset: -3px auto -3px 0;
+	pointer-events: none;
+	position: absolute;
+	width: 2px;
 }
 
 .file-explorer-tools-hidden-revealed.nav-file-title,
