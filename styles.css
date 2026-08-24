@@ -19,12 +19,13 @@ If your plugin does not need CSS, delete this file.
 	filter: opacity(55%);
 }
 
-.file-explorer-tools-hidden-marked > .nav-file-title-content::after,
-.file-explorer-tools-hidden-marked > .nav-folder-title-content::after,
+.file-explorer-tools-hidden-marked .nav-file-title-content::after,
+.file-explorer-tools-hidden-marked .nav-folder-title-content::after,
 .file-explorer-tools-hidden-marked.nav-file-title-content::after,
 .file-explorer-tools-hidden-marked.nav-folder-title-content::after {
 	color: var(--text-muted);
 	content: ' ◌';
+	display: inline-block;
 	font-size: 0.8em;
 	margin-left: 0.35em;
 }
