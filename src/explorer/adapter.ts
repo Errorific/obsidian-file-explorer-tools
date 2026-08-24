@@ -501,6 +501,7 @@ function readSortItem(value: unknown): ExplorerSortItem | null {
 	return {
 		path,
 		name: typeof file.name === 'string' ? file.name : nameOf(path),
+		basename: !folder && typeof file.basename === 'string' ? file.basename : undefined,
 		folder,
 		createdAt: folder ? null : readTimestamp(stat?.ctime),
 		modifiedAt: folder ? null : readTimestamp(stat?.mtime),

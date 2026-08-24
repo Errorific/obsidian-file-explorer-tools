@@ -188,6 +188,36 @@ describe('createExplorerAdapter', () => {
 		expect(view.getSortedFolderItems(folder)).toEqual(wrappers);
 	});
 
+	it('sorts files using their basenames', () => {
+		const { view } = createView();
+		const folder = {
+			path: 'Projects',
+			children: [
+				{
+					path: 'Projects/alpha 2.md',
+					name: 'alpha 2.md',
+					basename: 'alpha 2',
+					stat: { ctime: 10, mtime: 10 },
+				},
+				{
+					path: 'Projects/alpha.md',
+					name: 'alpha.md',
+					basename: 'alpha',
+					stat: { ctime: 20, mtime: 20 },
+				},
+			],
+		};
+		const wrappers = folder.children.map((file) => ({ file }));
+		view.getSortedFolderItems.mockImplementation(() => wrappers);
+		const adapter = createExplorerAdapter(view);
+		adapter.installSorting(() => ({
+			mixFilesAndFolders: true,
+			sortMode: 'name-ascending',
+		}));
+
+		expect(view.getSortedFolderItems(folder)).toEqual([wrappers[1], wrappers[0]]);
+	});
+
 	it('preserves native child sorting failures without synthesizing results', () => {
 		const { view } = createView();
 		const error = new Error('incompatible child sorting');

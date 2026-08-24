@@ -16,9 +16,12 @@ function file(
 	createdAt = 0,
 	modifiedAt = createdAt,
 ): ExplorerSortItem {
+	const name = path.slice(path.lastIndexOf('/') + 1);
+	const extensionIndex = name.lastIndexOf('.');
 	return {
 		path,
-		name: path.slice(path.lastIndexOf('/') + 1),
+		name,
+		basename: extensionIndex > 0 ? name.slice(0, extensionIndex) : name,
 		folder: false,
 		createdAt,
 		modifiedAt,
@@ -82,6 +85,15 @@ describe('compareExplorerItems', () => {
 		];
 
 		expect(sortedPaths(items, { sortMode: mode })).toEqual(expected);
+	});
+
+	it('sorts file basenames before longer names', () => {
+		expect(
+			sortedPaths([
+				file('alpha 2.md'),
+				file('alpha.md'),
+			]),
+		).toEqual(['alpha.md', 'alpha 2.md']);
 	});
 
 	it('mixes files and folders by name when configured', () => {

@@ -3,6 +3,7 @@ import type { SortMode } from '../settings';
 export interface ExplorerSortItem {
 	path: string;
 	name: string;
+	basename?: string;
 	folder: boolean;
 	createdAt: number | null;
 	modifiedAt: number | null;
@@ -81,14 +82,14 @@ function compareByMode(
 	mode: SortMode,
 ): number {
 	if (left.folder && right.folder && isTimeMode(mode)) {
-		return compareText(left.name, right.name);
+		return compareText(sortName(left), sortName(right));
 	}
 
 	switch (mode) {
 		case 'name-ascending':
-			return compareText(left.name, right.name);
+			return compareText(sortName(left), sortName(right));
 		case 'name-descending':
-			return compareText(right.name, left.name);
+			return compareText(sortName(right), sortName(left));
 		case 'modified-ascending':
 			return compareNumbers(left.modifiedAt, right.modifiedAt);
 		case 'modified-descending':
@@ -109,6 +110,10 @@ function compareNumbers(left: number | null, right: number | null): number {
 
 function compareText(left: string, right: string): number {
 	return NAME_COMPARER.compare(left, right);
+}
+
+function sortName(item: ExplorerSortItem): string {
+	return item.folder ? item.name : item.basename ?? item.name;
 }
 
 function comparePaths(left: string, right: string): number {
