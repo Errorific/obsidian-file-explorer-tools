@@ -51,7 +51,9 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		});
 		this.registerEvent(
 			this.app.vault.on('rename', (file, oldPath) => {
-				if (applyRename(this.settings, oldPath, file.path)) {
+				const changed = applyRename(this.settings, oldPath, file.path);
+				this.explorerController?.moveTemporaryVisibility(oldPath, file.path);
+				if (changed) {
 					void this.saveSettings();
 					this.explorerController?.refreshVisibility();
 				}

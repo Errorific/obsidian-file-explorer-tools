@@ -1,7 +1,12 @@
 import type { EventRef, TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, type FileExplorerToolsSettings } from '../settings';
 import { isHidden, pathsToReveal } from '../hiding/hidden-items';
-import { createLeafState, resetTemporaryVisibility, type ExplorerLeafState } from './leaf-state';
+import {
+	createLeafState,
+	moveTemporaryVisibility,
+	resetTemporaryVisibility,
+	type ExplorerLeafState,
+} from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
 import { createExplorerAdapter } from './adapter';
 import type { ExplorerAdapter } from './adapter-types';
@@ -114,6 +119,13 @@ export class ExplorerController {
 
 	refreshVisibility(): void {
 		for (const attached of this.attachedLeaves.values()) {
+			this.applyVisibility(attached);
+		}
+	}
+
+	moveTemporaryVisibility(oldPath: string, newPath: string): void {
+		for (const attached of this.attachedLeaves.values()) {
+			moveTemporaryVisibility(attached.state, oldPath, newPath);
 			this.applyVisibility(attached);
 		}
 	}
