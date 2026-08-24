@@ -31,7 +31,11 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.explorerController = new ExplorerController(this, {
 			getSettings: () => this.settings,
 			showNotice: (message) => new Notice(message),
-			folderNotes: createFolderNoteIntegration(this.app),
+			folderNotes: {
+				getAssociatedFolderPath: (file) =>
+					createFolderNoteIntegration(this.app)?.getAssociatedFolderPath(file) ??
+					null,
+			},
 		});
 		this.addCommand({
 			id: 'toggle-force-global-sorting',

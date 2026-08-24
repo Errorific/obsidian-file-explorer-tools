@@ -16,6 +16,8 @@ interface InternalExplorerItem {
 	collapsed?: unknown;
 	el?: unknown;
 	file?: { path?: unknown };
+	selfEl?: unknown;
+	titleEl?: unknown;
 	setCollapsed?: UnknownFunction;
 }
 
@@ -460,24 +462,27 @@ function readItemElement(
 	setAttribute(name: string, value: string): void;
 	removeAttribute(name: string): void;
 } | null {
-	if (!isRecord(item?.el) || !isRecord(item.el.classList)) {
-		return null;
+	for (const candidate of [item?.el, item?.selfEl, item?.titleEl]) {
+		if (!isRecord(candidate) || !isRecord(candidate.classList)) {
+			continue;
+		}
+		const classList = candidate.classList;
+		if (
+			typeof classList.add !== 'function' ||
+			typeof classList.remove !== 'function' ||
+			typeof classList.toggle !== 'function' ||
+			typeof candidate.setAttribute !== 'function' ||
+			typeof candidate.removeAttribute !== 'function'
+		) {
+			continue;
+		}
+		return candidate as {
+			classList: DOMTokenList;
+			setAttribute(name: string, value: string): void;
+			removeAttribute(name: string): void;
+		};
 	}
-	const classList = item.el.classList;
-	if (
-		typeof classList.add !== 'function' ||
-		typeof classList.remove !== 'function' ||
-		typeof classList.toggle !== 'function' ||
-		typeof item.el.setAttribute !== 'function' ||
-		typeof item.el.removeAttribute !== 'function'
-	) {
-		return null;
-	}
-	return item.el as {
-		classList: DOMTokenList;
-		setAttribute(name: string, value: string): void;
-		removeAttribute(name: string): void;
-	};
+	return null;
 }
 
 function readSortItem(value: unknown): ExplorerSortItem | null {

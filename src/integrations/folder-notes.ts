@@ -15,10 +15,15 @@ export function createFolderNoteIntegration(app: App): FolderNoteIntegration | n
 	const appRecord = app as unknown as Record<string, unknown>;
 	const plugins = readRecord(appRecord.plugins);
 	const getPlugin = plugins?.getPlugin;
-	const plugin =
+	const pluginFromMethod =
 		typeof getPlugin === 'function'
-			? (readRecord(getPlugin.call(plugins, 'folder-notes')) as FolderNotesPlugin | null)
+			? readRecord(getPlugin.call(plugins, 'folder-notes'))
 			: null;
+	const plugin =
+		(pluginFromMethod ??
+			readRecord(readRecord(plugins?.plugins)?.['folder-notes'])) as
+			| FolderNotesPlugin
+			| null;
 	const settings = plugin?.settings;
 	if (
 		settings === undefined ||
