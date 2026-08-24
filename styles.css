@@ -10,20 +10,6 @@ If your plugin does not need CSS, delete this file.
 	display: none;
 }
 
-.file-explorer-tools-hidden-revealed {
-	position: relative;
-}
-
-.file-explorer-tools-hidden-revealed::before {
-	background-color: var(--text-muted);
-	content: '';
-	filter: opacity(55%);
-	inset: -1px auto -1px 0;
-	pointer-events: none;
-	position: absolute;
-	width: 2px;
-}
-
 .file-explorer-tools-hidden-revealed.nav-file-title,
 .file-explorer-tools-hidden-revealed.nav-folder-title,
 .file-explorer-tools-hidden-revealed > .nav-file-title,
@@ -33,12 +19,12 @@ If your plugin does not need CSS, delete this file.
 	filter: opacity(55%);
 }
 
-.file-explorer-tools-hidden-revealed.nav-file-title-content,
-.file-explorer-tools-hidden-revealed.nav-folder-title-content,
-.file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-title-content,
-.file-explorer-tools-hidden-revealed > .nav-folder-title .nav-folder-title-content,
-.file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-tag,
-.file-explorer-tools-hidden-revealed > .nav-file-title .nav-file-icon,
-.file-explorer-tools-hidden-revealed > .nav-folder-title .nav-folder-collapse-indicator {
-	filter: opacity(55%);
+.file-explorer-tools-hidden-marked > .nav-file-title-content::after,
+.file-explorer-tools-hidden-marked > .nav-folder-title-content::after,
+.file-explorer-tools-hidden-marked.nav-file-title-content::after,
+.file-explorer-tools-hidden-marked.nav-folder-title-content::after {
+	color: var(--text-muted);
+	content: ' ◌';
+	font-size: 0.8em;
+	margin-left: 0.35em;
 }

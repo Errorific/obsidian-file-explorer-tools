@@ -308,6 +308,7 @@ describe('ExplorerController', () => {
 			hidden: true,
 			showHidden: true,
 			dimmed: true,
+			marked: true,
 		});
 	});
 
@@ -347,6 +348,7 @@ describe('ExplorerController', () => {
 			hidden: false,
 			showHidden: true,
 			dimmed: true,
+			marked: false,
 		});
 	});
 

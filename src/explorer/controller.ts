@@ -259,6 +259,7 @@ export class ExplorerController {
 				hidden,
 				showHidden: visible,
 				dimmed: hiddenAncestorIsVisible,
+				marked: hidden,
 			});
 		}
 	}

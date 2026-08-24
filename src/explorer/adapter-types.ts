@@ -22,6 +22,7 @@ export interface ItemVisibility {
 	hidden: boolean;
 	showHidden: boolean;
 	dimmed: boolean;
+	marked: boolean;
 }
 
 export interface ExplorerCompatibilityReport {
