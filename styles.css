@@ -19,8 +19,10 @@ If your plugin does not need CSS, delete this file.
 	filter: opacity(55%);
 }
 
-.file-explorer-tools-hidden-marked .nav-file-title-content::after,
-.file-explorer-tools-hidden-marked .nav-folder-title-content::after,
+.file-explorer-tools-hidden-marked > .nav-file-title .nav-file-title-content::after,
+.file-explorer-tools-hidden-marked > .nav-folder-title .nav-folder-title-content::after,
+.file-explorer-tools-hidden-marked > .nav-file-title-content::after,
+.file-explorer-tools-hidden-marked > .nav-folder-title-content::after,
 .file-explorer-tools-hidden-marked.nav-file-title-content::after,
 .file-explorer-tools-hidden-marked.nav-folder-title-content::after {
 	color: var(--text-muted);
