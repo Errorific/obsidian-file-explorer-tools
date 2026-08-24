@@ -7,6 +7,7 @@ import {
 } from './settings';
 import { applyDelete, applyRename } from './settings-events';
 import { registerHiddenItemMenu } from './hiding/menu';
+import { createFolderNoteIntegration } from './integrations/folder-notes';
 import { registerFolderSortMenu } from './sorting/folder-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
@@ -30,6 +31,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.explorerController = new ExplorerController(this, {
 			getSettings: () => this.settings,
 			showNotice: (message) => new Notice(message),
+			folderNotes: createFolderNoteIntegration(this.app),
 		});
 		this.addCommand({
 			id: 'toggle-force-global-sorting',

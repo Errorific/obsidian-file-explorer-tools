@@ -1,4 +1,5 @@
 import type { EventRef, TFile } from 'obsidian';
+import type { FolderNoteIntegration } from '../integrations/folder-notes';
 import { DEFAULT_SETTINGS, type FileExplorerToolsSettings } from '../settings';
 import { isHidden, pathsToReveal } from '../hiding/hidden-items';
 import {
@@ -39,6 +40,7 @@ export interface ExplorerControllerOptions {
 	createAdapter?: (view: unknown) => ExplorerAdapter;
 	getSettings?: () => FileExplorerToolsSettings;
 	showNotice: (message: string) => void;
+	folderNotes?: FolderNoteIntegration | null;
 }
 
 interface AttachedExplorer {
@@ -52,6 +54,7 @@ export class ExplorerController {
 	private readonly createAdapter: (view: unknown) => ExplorerAdapter;
 	private readonly getSettings: () => FileExplorerToolsSettings;
 	private readonly showNotice: (message: string) => void;
+	private readonly folderNotes: FolderNoteIntegration | null;
 	private disposed = false;
 	private forceGlobal = false;
 	private started = false;
@@ -63,6 +66,7 @@ export class ExplorerController {
 		this.createAdapter = options.createAdapter ?? createExplorerAdapter;
 		this.getSettings = options.getSettings ?? (() => DEFAULT_SETTINGS);
 		this.showNotice = options.showNotice;
+		this.folderNotes = options.folderNotes ?? null;
 	}
 
 	start(): void {
@@ -87,7 +91,7 @@ export class ExplorerController {
 					for (const attached of this.attachedLeaves.values()) {
 						resetTemporaryVisibility(attached.state);
 						if (file != null) {
-							for (const path of pathsToReveal(file.path, this.getSettings())) {
+							for (const path of this.pathsToReveal(file)) {
 								attached.state.temporaryVisiblePaths.add(path);
 							}
 						}
@@ -234,7 +238,7 @@ export class ExplorerController {
 			adapter.runOriginalSort();
 			const activeFile = this.plugin.app.workspace.getActiveFile();
 			if (activeFile !== null) {
-				for (const path of pathsToReveal(activeFile.path, this.getSettings())) {
+				for (const path of this.pathsToReveal(activeFile)) {
 					attached.state.temporaryVisiblePaths.add(path);
 				}
 			}
@@ -274,6 +278,19 @@ export class ExplorerController {
 				marked: hidden,
 			});
 		}
+	}
+
+	private pathsToReveal(file: TFile): string[] {
+		const paths = pathsToReveal(file.path, this.getSettings());
+		const associatedFolder = this.folderNotes?.getAssociatedFolderPath(file);
+		if (associatedFolder !== null && associatedFolder !== undefined) {
+			for (const path of pathsToReveal(associatedFolder, this.getSettings())) {
+				if (!paths.includes(path)) {
+					paths.push(path);
+				}
+			}
+		}
+		return paths;
 	}
 
 	revealPath(path: string, leaf?: ExplorerLeaf): void {
