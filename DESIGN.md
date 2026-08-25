@@ -420,7 +420,7 @@ Status: Implemented and manually verified against Obsidian 1.13.7. Multiple expl
 
 ### Phase 5: Navigation
 
-Status: Implemented with automated coverage. Manual Obsidian verification is pending.
+Status: Implemented and manually verified against Obsidian 1.13.7.
 
 - Implement locate-current-file
 - Detect visible and selected state
@@ -499,6 +499,7 @@ Every implementation phase must meet these criteria before it is considered comp
 - Folder Notes stores adjacent notes using `storageLocation: 'parentFolder'` and derives the associated folder from `folderNoteName`, commonly `{{folder_name}}`.
 - Folder Notes decorates explorer entries through `fileItems[path].selfEl` or `titleEl` and uses classes including `has-folder-note` and `is-folder-note`. File Explorer Tools preserves these classes by changing only its own classes.
 - Manual verification covered hiding, reveal styling, rerenders, vault changes, persistence, Folder Notes adjacent notes, plugin reload/disable, and console cleanliness.
+- Navigation verification covered hidden-path reveal, ancestor expansion, selection, centered scrolling, second-click collapse, off-screen relocalization, explicit collapse commands, Folder Notes subtree preservation, command-driven reveal mode, and toolbar cleanup across disable and re-enable.
 
 ## Risks and mitigations
 
