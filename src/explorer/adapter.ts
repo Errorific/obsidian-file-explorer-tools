@@ -284,6 +284,23 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		};
 	}
 
+	isItemVisible(path: string): boolean {
+		const itemBounds = readBounds(readItemElement(this.findItem(path)));
+		const containerBounds = readBounds(this.view.navFileContainerEl);
+		if (itemBounds === null || containerBounds === null) {
+			return false;
+		}
+
+		return (
+			itemBounds.width > 0 &&
+			itemBounds.height > 0 &&
+			itemBounds.bottom > containerBounds.top &&
+			itemBounds.top < containerBounds.bottom &&
+			itemBounds.right > containerBounds.left &&
+			itemBounds.left < containerBounds.right
+		);
+	}
+
 	observeRenders(callback: () => void): (() => void) | null {
 		const container = this.view.navFileContainerEl;
 		if (!isNode(container)) {
@@ -459,6 +476,7 @@ function readItemElement(
 	item: InternalExplorerItem | null,
 ): {
 	classList: DOMTokenList;
+	getBoundingClientRect?: () => DOMRect;
 	setAttribute(name: string, value: string): void;
 	removeAttribute(name: string): void;
 } | null {
@@ -478,11 +496,55 @@ function readItemElement(
 		}
 		return candidate as {
 			classList: DOMTokenList;
+			getBoundingClientRect?: () => DOMRect;
 			setAttribute(name: string, value: string): void;
 			removeAttribute(name: string): void;
 		};
 	}
 	return null;
+}
+
+interface Bounds {
+	bottom: number;
+	height: number;
+	left: number;
+	right: number;
+	top: number;
+	width: number;
+}
+
+function readBounds(value: unknown): Bounds | null {
+	if (!isRecord(value) || typeof value.getBoundingClientRect !== 'function') {
+		return null;
+	}
+
+	try {
+		const bounds: unknown = Reflect.apply(value.getBoundingClientRect, value, []);
+		if (!isRecord(bounds)) {
+			return null;
+		}
+		const top = readFiniteNumber(bounds.top);
+		const right = readFiniteNumber(bounds.right);
+		const bottom = readFiniteNumber(bounds.bottom);
+		const left = readFiniteNumber(bounds.left);
+		if (top === null || right === null || bottom === null || left === null) {
+			return null;
+		}
+		return {
+			top,
+			right,
+			bottom,
+			left,
+			width: readFiniteNumber(bounds.width) ?? right - left,
+			height: readFiniteNumber(bounds.height) ?? bottom - top,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function readFiniteNumber(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function readSortItem(value: unknown): ExplorerSortItem | null {

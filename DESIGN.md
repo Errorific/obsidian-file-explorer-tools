@@ -420,6 +420,8 @@ Status: Implemented and manually verified against Obsidian 1.13.7. Multiple expl
 
 ### Phase 5: Navigation
 
+Status: Implemented with automated coverage. Manual Obsidian verification is pending.
+
 - Implement locate-current-file
 - Detect visible and selected state
 - Implement the second-click rule
@@ -473,7 +475,7 @@ Pure functionality should be tested without an Obsidian runtime wherever possibl
 
 Explorer adapter tests should use narrow fakes matching the undocumented structures the adapter expects. Manual tests in the linked vault are still required for DOM behavior, toolbar placement, explorer rerenders, native drag and drop, and compatibility with Folder Notes.
 
-Obsidian 1.13.7 exposes the core file explorer as a singleton through its user interface. Multi-leaf controller behavior is covered with adapter tests, but cannot be reproduced through a supported manual layout.
+Obsidian 1.13.7 exposes the core file explorer as a singleton through its user interface. Multi-leaf controller behavior is covered with adapter tests, but cannot be reproduced through a supported manual layout. Toolbar actions target the explorer leaf that owns the control, while commands operate on every attached explorer leaf.
 
 Test output must be clean. Expected errors from compatibility tests must be captured and asserted.
 
@@ -493,6 +495,7 @@ Every implementation phase must meet these criteria before it is considered comp
 ## Research notes
 
 - Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
+- Follow-up research found no supported user-interface action for opening a second built-in file explorer. Obsidian core requests `getLeavesOfType("file-explorer")` and uses the first result, creating a left-sidebar leaf with `setViewState({ type: "file-explorer" })` only when none exists. A plugin can attempt to assign the view type to another leaf, but coexistence and workspace persistence for multiple built-in explorers are undocumented and unverified.
 - Folder Notes stores adjacent notes using `storageLocation: 'parentFolder'` and derives the associated folder from `folderNoteName`, commonly `{{folder_name}}`.
 - Folder Notes decorates explorer entries through `fileItems[path].selfEl` or `titleEl` and uses classes including `has-folder-note` and `is-folder-note`. File Explorer Tools preserves these classes by changing only its own classes.
 - Manual verification covered hiding, reveal styling, rerenders, vault changes, persistence, Folder Notes adjacent notes, plugin reload/disable, and console cleanliness.

@@ -53,6 +53,7 @@ export interface ExplorerAdapter {
 	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
+	isItemVisible(path: string): boolean;
 	observeRenders(callback: () => void): (() => void) | null;
 	refreshToolbarActions(): void;
 	runOriginalSort(): boolean;

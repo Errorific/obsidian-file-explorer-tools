@@ -29,6 +29,7 @@ function createAdapter() {
 		setItemVisibility: vi.fn(() => true),
 		getSortMode,
 		installSorting: vi.fn(() => vi.fn()),
+		isItemVisible: vi.fn(() => false),
 		observeRenders: vi.fn(() => vi.fn()),
 		refreshToolbarActions: vi.fn(),
 		runOriginalSort,

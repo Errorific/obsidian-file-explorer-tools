@@ -1,4 +1,5 @@
 import { Notice, Plugin } from 'obsidian';
+import { registerCommands } from './commands/register';
 import { ExplorerController } from './explorer/controller';
 import {
 	type FileExplorerToolsSettings,
@@ -37,11 +38,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 					null,
 			},
 		});
-		this.addCommand({
-			id: 'toggle-force-global-sorting',
-			name: 'Toggle force global sorting',
-			callback: () => this.explorerController?.toggleForceGlobal(),
-		});
+		registerCommands(this, () => this.explorerController);
 		registerFolderSortMenu(this);
 		registerHiddenItemMenu(this);
 		this.app.workspace.onLayoutReady(() => {

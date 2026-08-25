@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TFile } from 'obsidian';
 import type { FileExplorerToolsSettings } from '../settings';
+import { FakeVault } from '../testing/vault-fakes';
 import type { ExplorerAdapter, ToolbarAction } from './adapter-types';
 import {
 	ExplorerController,
@@ -36,34 +37,57 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 			return disposeToolbar;
 		},
 	);
+	const collapse = vi.fn(() => true);
+	const expand = vi.fn(() => true);
+	const isItemVisible = vi.fn(() => false);
+	const refreshToolbarActions = vi.fn();
+	const scrollTo = vi.fn(() => true);
+	const select = vi.fn(() => true);
 	const adapter: ExplorerAdapter = {
 		addToolbarAction,
-		collapse: vi.fn(() => true),
-		expand: vi.fn(() => true),
+		collapse,
+		expand,
 		getCompatibilityReport,
 		getItems: vi.fn(() => []),
 		setItemVisibility: vi.fn(() => true),
 		getSortMode,
 		installSorting,
+		isItemVisible,
 		observeRenders: vi.fn(() => disposeObserver),
-		refreshToolbarActions: vi.fn(),
+		refreshToolbarActions,
 		runOriginalSort,
-		scrollTo: vi.fn(() => true),
-		select: vi.fn(() => true),
+		scrollTo,
+		select,
 		...overrides,
 	};
 	return {
 		actions,
 		adapter,
+		collapse,
 		disposeObserver,
 		disposeToolbar,
+		expand,
 		installSorting,
+		isItemVisible,
+		refreshToolbarActions,
 		runOriginalSort,
+		scrollTo,
+		select,
 	};
 }
 
-function createHost(initialLeaves: ExplorerLeaf[]) {
+function createFile(path: string): TFile {
+	const vault = new FakeVault();
+	const separatorIndex = path.lastIndexOf('/');
+	if (separatorIndex >= 0) {
+		vault.createFolder(path.slice(0, separatorIndex));
+	}
+	return vault.createFile(path);
+}
+
+function createHost(initialLeaves: ExplorerLeaf[], initialActiveFile: TFile | null = null) {
 	let leaves = initialLeaves;
+	let activeFile = initialActiveFile;
 	let layoutReadyCallback: (() => void) | null = null;
 	let layoutChangeCallback: (() => void) | null = null;
 	let fileOpenCallback: (() => void) | null = null;
@@ -88,7 +112,7 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 		app: {
 			workspace: {
 				getLeavesOfType,
-				getActiveFile: () => null,
+				getActiveFile: () => activeFile,
 				on: (
 					name: 'layout-change' | 'file-open',
 					callback: (file?: TFile | null) => void,
@@ -104,6 +128,9 @@ function createHost(initialLeaves: ExplorerLeaf[]) {
 	return {
 		host,
 		registerEvent,
+		setActiveFile: (file: TFile | null) => {
+			activeFile = file;
+		},
 		setLeaves: (nextLeaves: ExplorerLeaf[]) => {
 			leaves = nextLeaves;
 		},
@@ -133,7 +160,7 @@ describe('ExplorerController', () => {
 		expect(registerEvent).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(disposeToolbar).toHaveBeenCalledTimes(3);
+		expect(disposeToolbar).toHaveBeenCalledTimes(4);
 		expect(disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -158,12 +185,12 @@ describe('ExplorerController', () => {
 		setLeaves([secondLeaf]);
 		triggerLayoutChange();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(4);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(4);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -190,7 +217,7 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(4);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 		expect(showNotice).toHaveBeenCalledWith(
@@ -198,7 +225,7 @@ describe('ExplorerController', () => {
 		);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(4);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -261,8 +288,10 @@ describe('ExplorerController', () => {
 
 		controller.start();
 		triggerLayoutReady();
-		expect(first.actions).toHaveLength(3);
-		first.actions[2]?.callback();
+		expect(first.actions).toHaveLength(4);
+		first.actions
+			.find((action) => action.title === 'Toggle force global sorting')
+			?.callback();
 
 		expect(controller.isForceGlobal()).toBe(true);
 		expect(first.runOriginalSort).toHaveBeenCalledTimes(2);
@@ -350,6 +379,231 @@ describe('ExplorerController', () => {
 			dimmed: true,
 			marked: false,
 		});
+	});
+
+	it('toggles hidden items in every explorer from a command', () => {
+		const firstLeaf = { view: { id: 'first' } };
+		const secondLeaf = { view: { id: 'second' } };
+		const { host, triggerLayoutReady } = createHost([firstLeaf, secondLeaf]);
+		const first = createAdapter();
+		const second = createAdapter();
+		const createAdapterForView = vi
+			.fn()
+			.mockReturnValueOnce(first.adapter)
+			.mockReturnValueOnce(second.adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.toggleHiddenItems();
+
+		expect(first.refreshToolbarActions).toHaveBeenCalledOnce();
+		expect(second.refreshToolbarActions).toHaveBeenCalledOnce();
+		expect(
+			first.actions.find((action) => action.title === 'Toggle hidden items')
+				?.getPressed?.(),
+		).toBe(true);
+		expect(
+			second.actions.find((action) => action.title === 'Toggle hidden items')
+				?.getPressed?.(),
+		).toBe(true);
+	});
+
+	it('locates the active file in every explorer from a command', () => {
+		const activeFile = createFile('Projects/Active/Plan.md');
+		const firstLeaf = { view: { id: 'first' } };
+		const secondLeaf = { view: { id: 'second' } };
+		const { host, triggerLayoutReady } = createHost(
+			[firstLeaf, secondLeaf],
+			activeFile,
+		);
+		const items = [
+			{ path: 'Projects', folder: true, collapsed: true, selected: false },
+			{
+				path: 'Projects/Active',
+				folder: true,
+				collapsed: true,
+				selected: false,
+			},
+			{
+				path: activeFile.path,
+				folder: false,
+				collapsed: null,
+				selected: false,
+			},
+		];
+		const first = createAdapter({ getItems: vi.fn(() => items) });
+		const second = createAdapter({ getItems: vi.fn(() => items) });
+		const createAdapterForView = vi
+			.fn()
+			.mockReturnValueOnce(first.adapter)
+			.mockReturnValueOnce(second.adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			getSettings: () => settings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		for (const adapter of [first, second]) {
+			expect(adapter.expand).toHaveBeenCalledWith('Projects');
+			expect(adapter.expand).toHaveBeenCalledWith('Projects/Active');
+			expect(adapter.scrollTo).toHaveBeenCalledWith(activeFile.path);
+			expect(adapter.select).toHaveBeenCalledWith(activeFile.path);
+		}
+	});
+
+	it('targets only its explorer from the locate toolbar action', () => {
+		const activeFile = createFile('Plan.md');
+		const firstLeaf = { view: { id: 'first' } };
+		const secondLeaf = { view: { id: 'second' } };
+		const { host, triggerLayoutReady } = createHost(
+			[firstLeaf, secondLeaf],
+			activeFile,
+		);
+		const first = createAdapter();
+		const second = createAdapter();
+		const createAdapterForView = vi
+			.fn()
+			.mockReturnValueOnce(first.adapter)
+			.mockReturnValueOnce(second.adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		first.actions
+			.find((action) => action.title === 'Locate current file')
+			?.callback();
+
+		expect(first.scrollTo).toHaveBeenCalledWith(activeFile.path);
+		expect(second.scrollTo).not.toHaveBeenCalled();
+	});
+
+	it('collapses unrelated folders when the selected active file is visible', () => {
+		const activeFile = createFile('Projects/Active/Plan.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const collapse = vi.fn(() => true);
+		const scrollTo = vi.fn(() => true);
+		const select = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			collapse,
+			getItems: vi.fn(() => [
+				{ path: 'Projects', folder: true, collapsed: false, selected: false },
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{ path: 'Archive', folder: true, collapsed: false, selected: false },
+				{
+					path: activeFile.path,
+					folder: false,
+					collapsed: null,
+					selected: true,
+				},
+			]),
+			isItemVisible: vi.fn(() => true),
+			scrollTo,
+			select,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		expect(collapse).toHaveBeenCalledOnce();
+		expect(collapse).toHaveBeenCalledWith('Archive');
+		expect(scrollTo).not.toHaveBeenCalled();
+		expect(select).not.toHaveBeenCalled();
+	});
+
+	it('locates a selected active file again when it is off-screen', () => {
+		const activeFile = createFile('Plan.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const collapse = vi.fn(() => true);
+		const scrollTo = vi.fn(() => true);
+		const select = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			collapse,
+			getItems: vi.fn(() => [
+				{ path: 'Archive', folder: true, collapsed: false, selected: false },
+				{
+					path: activeFile.path,
+					folder: false,
+					collapsed: null,
+					selected: true,
+				},
+			]),
+			isItemVisible: vi.fn(() => false),
+			scrollTo,
+			select,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		expect(scrollTo).toHaveBeenCalledWith(activeFile.path);
+		expect(select).toHaveBeenCalledWith(activeFile.path);
+		expect(collapse).not.toHaveBeenCalled();
+	});
+
+	it('preserves an associated folder subtree during explicit collapse', () => {
+		const activeFile = createFile('Projects/Active.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const collapse = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			collapse,
+			getItems: vi.fn(() => [
+				{ path: 'Projects', folder: true, collapsed: false, selected: false },
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{
+					path: 'Projects/Active/Research',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{ path: 'Archive', folder: true, collapsed: false, selected: false },
+			]),
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			folderNotes: { getAssociatedFolderPath: () => 'Projects/Active' },
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.collapseToCurrentPath();
+
+		expect(collapse).toHaveBeenCalledOnce();
+		expect(collapse).toHaveBeenCalledWith('Archive');
 	});
 
 	it('reapplies sorting when settings change', () => {

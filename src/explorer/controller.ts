@@ -9,6 +9,10 @@ import {
 	type ExplorerLeafState,
 } from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
+import {
+	getAncestorFolderPaths,
+	getFoldersToCollapse,
+} from '../navigation/path-state';
 import { createExplorerAdapter } from './adapter';
 import type { ExplorerAdapter } from './adapter-types';
 import { addCompatibilityAction, formatCompatibilityReport } from './toolbar';
@@ -134,12 +138,61 @@ export class ExplorerController {
 		}
 	}
 
+	toggleHiddenItems(): void {
+		for (const attached of this.attachedLeaves.values()) {
+			this.toggleHiddenItemsFor(attached);
+		}
+	}
+
 	toggleForceGlobal(): void {
 		this.forceGlobal = !this.forceGlobal;
 		for (const { adapter } of this.attachedLeaves.values()) {
 			adapter.refreshToolbarActions();
 		}
 		this.refreshSorting();
+	}
+
+	locateCurrentFile(leaf?: ExplorerLeaf): void {
+		const file = this.plugin.app.workspace.getActiveFile();
+		if (file === null) {
+			return;
+		}
+
+		for (const [candidate, attached] of this.attachedLeaves) {
+			if (leaf !== undefined && candidate !== leaf) {
+				continue;
+			}
+			const item = attached.adapter
+				.getItems()
+				.find(({ path }) => path === file.path);
+			if (item?.selected && attached.adapter.isItemVisible(file.path)) {
+				this.collapseAttachedExplorer(attached, file);
+				continue;
+			}
+
+			for (const path of this.pathsToReveal(file)) {
+				attached.state.temporaryVisiblePaths.add(path);
+			}
+			this.applyVisibility(attached);
+			for (const path of getAncestorFolderPaths(file.path)) {
+				attached.adapter.expand(path);
+			}
+			attached.adapter.scrollTo(file.path);
+			attached.adapter.select(file.path);
+		}
+	}
+
+	collapseToCurrentPath(leaf?: ExplorerLeaf): void {
+		const file = this.plugin.app.workspace.getActiveFile();
+		if (file === null) {
+			return;
+		}
+
+		for (const [candidate, attached] of this.attachedLeaves) {
+			if (leaf === undefined || candidate === leaf) {
+				this.collapseAttachedExplorer(attached, file);
+			}
+		}
 	}
 
 	private attachExplorerLeaves(): void {
@@ -165,7 +218,7 @@ export class ExplorerController {
 
 			try {
 				const adapter = this.createAdapter(leaf.view);
-				const attached = this.attachLeaf(adapter);
+				const attached = this.attachLeaf(leaf, adapter);
 				this.attachedLeaves.set(leaf, attached);
 			} catch {
 				runSafely(() => this.showNotice(ATTACHMENT_FAILURE_MESSAGE));
@@ -173,7 +226,10 @@ export class ExplorerController {
 		}
 	}
 
-	private attachLeaf(adapter: ExplorerAdapter): AttachedExplorer {
+	private attachLeaf(
+		leaf: ExplorerLeaf,
+		adapter: ExplorerAdapter,
+	): AttachedExplorer {
 		const disposers: Array<() => void> = [];
 		const attached: AttachedExplorer = {
 			adapter,
@@ -214,15 +270,20 @@ export class ExplorerController {
 			const disposeRevealAction = adapter.addToolbarAction({
 				icon: 'eye-off',
 				title: 'Toggle hidden items',
-				callback: () => {
-					attached.state.showHidden = !attached.state.showHidden;
-					this.applyVisibility(attached);
-					adapter.refreshToolbarActions();
-				},
+				callback: () => this.toggleHiddenItemsFor(attached),
 				getPressed: () => attached.state.showHidden,
 			});
 			if (disposeRevealAction !== null) {
 				disposers.push(disposeRevealAction);
+			}
+
+			const disposeLocateAction = adapter.addToolbarAction({
+				icon: 'locate-fixed',
+				title: 'Locate current file',
+				callback: () => this.locateCurrentFile(leaf),
+			});
+			if (disposeLocateAction !== null) {
+				disposers.push(disposeLocateAction);
 			}
 
 			const disposeForceGlobalAction = adapter.addToolbarAction({
@@ -255,6 +316,27 @@ export class ExplorerController {
 		}
 
 		return attached;
+	}
+
+	private collapseAttachedExplorer(
+		attached: AttachedExplorer,
+		file: TFile,
+	): void {
+		const associatedFolder = this.folderNotes?.getAssociatedFolderPath(file);
+		const retainedPath = associatedFolder ?? file.path;
+		for (const path of getFoldersToCollapse(
+			attached.adapter.getItems(),
+			retainedPath,
+			associatedFolder !== null && associatedFolder !== undefined,
+		)) {
+			attached.adapter.collapse(path);
+		}
+	}
+
+	private toggleHiddenItemsFor(attached: AttachedExplorer): void {
+		attached.state.showHidden = !attached.state.showHidden;
+		this.applyVisibility(attached);
+		attached.adapter.refreshToolbarActions();
 	}
 
 	private applyVisibility(attached: AttachedExplorer): void {
