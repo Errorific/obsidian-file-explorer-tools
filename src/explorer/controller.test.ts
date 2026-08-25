@@ -160,7 +160,7 @@ describe('ExplorerController', () => {
 		expect(registerEvent).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(disposeToolbar).toHaveBeenCalledTimes(4);
+		expect(disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -185,12 +185,12 @@ describe('ExplorerController', () => {
 		setLeaves([secondLeaf]);
 		triggerLayoutChange();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(4);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(4);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -217,7 +217,7 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(first.disposeToolbar).toHaveBeenCalledTimes(4);
+		expect(first.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(first.disposeObserver).toHaveBeenCalledOnce();
 		expect(createAdapterForView).toHaveBeenCalledTimes(2);
 		expect(showNotice).toHaveBeenCalledWith(
@@ -225,7 +225,7 @@ describe('ExplorerController', () => {
 		);
 
 		controller.dispose();
-		expect(second.disposeToolbar).toHaveBeenCalledTimes(4);
+		expect(second.disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(second.disposeObserver).toHaveBeenCalledOnce();
 	});
 
@@ -288,7 +288,11 @@ describe('ExplorerController', () => {
 
 		controller.start();
 		triggerLayoutReady();
-		expect(first.actions).toHaveLength(4);
+		expect(first.actions.map(({ title }) => title)).toEqual([
+			'Toggle hidden items',
+			'Locate current file',
+			'Toggle force global sorting',
+		]);
 		first.actions
 			.find((action) => action.title === 'Toggle force global sorting')
 			?.callback();
@@ -331,7 +335,9 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 		controller.revealPath('Private.md');
-		actions[1]?.callback();
+		actions
+			.find((action) => action.title === 'Toggle hidden items')
+			?.callback();
 
 		expect(setItemVisibility).toHaveBeenLastCalledWith('Private.md', {
 			hidden: true,
@@ -371,7 +377,9 @@ describe('ExplorerController', () => {
 
 		controller.start();
 		triggerLayoutReady();
-		actions[1]?.callback();
+		actions
+			.find((action) => action.title === 'Toggle hidden items')
+			?.callback();
 
 		expect(setItemVisibility).toHaveBeenLastCalledWith('Private/Note.md', {
 			hidden: false,

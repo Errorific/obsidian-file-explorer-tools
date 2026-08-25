@@ -15,7 +15,7 @@ import {
 } from '../navigation/path-state';
 import { createExplorerAdapter } from './adapter';
 import type { ExplorerAdapter } from './adapter-types';
-import { addCompatibilityAction, formatCompatibilityReport } from './toolbar';
+import { formatCompatibilityReport } from './toolbar';
 
 const FILE_EXPLORER_VIEW_TYPE = 'file-explorer';
 const ATTACHMENT_FAILURE_MESSAGE =
@@ -256,15 +256,6 @@ export class ExplorerController {
 			});
 			if (disposeRenderObserver !== null) {
 				disposers.push(disposeRenderObserver);
-			}
-
-			const disposeToolbarAction = addCompatibilityAction(
-				adapter,
-				() => renderCount,
-				this.showNotice,
-			);
-			if (disposeToolbarAction !== null) {
-				disposers.push(disposeToolbarAction);
 			}
 
 			const disposeRevealAction = adapter.addToolbarAction({
