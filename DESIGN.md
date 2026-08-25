@@ -431,7 +431,7 @@ Status: Implemented and manually verified against Obsidian 1.13.7.
 
 ### Phase 6: Folder Notes integration
 
-Status: Implemented. Manual verification against Folder Notes remains required.
+Status: Implemented and manually verified with Folder Notes 1.8.26.
 
 The guarded integration reads the enabled `folder-notes` plugin's `folderNoteName` and `storageLocation` settings. It supports current `insideFolder` and `parentFolder` storage modes, fixed inside-folder names, and names containing one `{{folder_name}}` marker. Associations are accepted only when the derived folder exists. Unsupported or malformed settings fall back to ordinary note behavior. Folder Notes explorer items may expose `selfEl` or `titleEl` rather than `el`; the explorer adapter supports all three fields.
 
@@ -501,6 +501,8 @@ Every implementation phase must meet these criteria before it is considered comp
 - Folder Notes stores notes using `storageLocation: 'insideFolder'` or `storageLocation: 'parentFolder'` and derives names from `folderNoteName`, commonly `{{folder_name}}`. Its source retains a `vaultFolder` settings value that is absent from the current settings UI and cannot unambiguously associate nested folders, so the integration fails open for that value.
 - Folder Notes supports fixed note names when notes are stored inside their associated folders. Parent-folder storage requires a `{{folder_name}}` marker to derive the adjacent folder.
 - Folder Notes decorates explorer entries through `fileItems[path].selfEl` or `titleEl` and uses classes including `has-folder-note` and `is-folder-note`. File Explorer Tools preserves these classes by changing only its own classes.
+- Manual Folder Notes verification covered adjacent and fixed-name inside-folder notes, temporary reveal of hidden associated folders, associated-subtree preservation, unrelated-folder collapse, click-to-open behavior, and clean console output.
+- Folder Notes 1.8.26 does not reliably restore click-to-open behavior when it is disabled and re-enabled in an already-open vault. The issue begins when Folder Notes alone is toggled, persists after File Explorer Tools is disabled, and clears after restarting the vault.
 - Manual verification covered hiding, reveal styling, rerenders, vault changes, persistence, Folder Notes adjacent notes, plugin reload/disable, and console cleanliness.
 - Navigation verification covered hidden-path reveal, ancestor expansion, selection, centered scrolling, second-click collapse, off-screen relocalization, explicit collapse commands, Folder Notes subtree preservation, command-driven reveal mode, and toolbar cleanup across disable and re-enable.
 
