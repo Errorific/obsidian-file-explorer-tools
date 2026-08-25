@@ -351,6 +351,28 @@ describe('createExplorerAdapter', () => {
 			view.fileItems['Welcome.md'],
 			true,
 		);
+		view.navFileContainerEl.getBoundingClientRect = () => ({
+			bottom: 500,
+			left: 0,
+			right: 300,
+			top: 0,
+		});
+		expect(adapter.scrollTo('Welcome.md')).toBe(true);
+		expect(view.tree.infinityScroll.scrollIntoView).toHaveBeenCalledWith(
+			view.fileItems['Welcome.md'],
+			250,
+		);
+	});
+
+	it('uses minimal scroll padding when viewport bounds are unavailable', () => {
+		const { view } = createView();
+		(
+			view.navFileContainerEl as {
+				getBoundingClientRect?: () => unknown;
+			}
+		).getBoundingClientRect = undefined;
+		const adapter = createExplorerAdapter(view);
+
 		expect(adapter.scrollTo('Welcome.md')).toBe(true);
 		expect(view.tree.infinityScroll.scrollIntoView).toHaveBeenCalledWith(
 			view.fileItems['Welcome.md'],

@@ -345,7 +345,12 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}
 
 		try {
-			scrollIntoView.call(this.view.tree?.infinityScroll, item, 4);
+			const containerHeight = readBounds(this.view.navFileContainerEl)?.height;
+			const padding =
+				containerHeight === undefined
+					? 4
+					: Math.max(4, Math.floor(containerHeight / 2));
+			scrollIntoView.call(this.view.tree?.infinityScroll, item, padding);
 			return true;
 		} catch {
 			this.failedCapabilities.add(CAPABILITY_LABELS.scroll);
