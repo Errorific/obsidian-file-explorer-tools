@@ -161,7 +161,10 @@ describe('Folder Notes integration', () => {
 
 	it('does not activate when Folder Notes is disabled', () => {
 		const { app } = createApp(defaultSettings());
-		Object.assign(app.plugins, { enabledPlugins: new Set<string>() });
+		const appRecord = app as unknown as {
+			plugins: Record<string, unknown>;
+		};
+		appRecord.plugins.enabledPlugins = new Set<string>();
 
 		expect(createFolderNoteIntegration(app)).toBeNull();
 	});
