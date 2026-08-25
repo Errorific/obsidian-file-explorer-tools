@@ -6,6 +6,7 @@ import {
 
 interface FakeItem {
 	collapsed?: boolean;
+	el?: unknown;
 	file: { path: string };
 	setCollapsed?: ReturnType<typeof vi.fn>;
 }
@@ -44,7 +45,10 @@ function createView() {
 		getSortedFolderItems: vi.fn(
 			(folder: { path?: string; children: unknown[] }) => [...folder.children],
 		),
-		navFileContainerEl: { nodeType: 1 },
+		navFileContainerEl: {
+			nodeType: 1,
+			getBoundingClientRect: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+		},
 		sort: vi.fn(),
 		sortOrder: 'alphabetical',
 		tree: {
@@ -297,6 +301,39 @@ describe('createExplorerAdapter', () => {
 		]);
 	});
 
+	it('detects whether an item is visible within the explorer viewport', () => {
+		const { fileItem, view } = createView();
+		view.navFileContainerEl = {
+			nodeType: 1,
+			getBoundingClientRect: () => ({ bottom: 500, left: 0, right: 300, top: 0 }),
+		};
+		const element = {
+			classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
+			getBoundingClientRect: () => ({ bottom: 120, left: 0, right: 300, top: 100 }),
+			removeAttribute: vi.fn(),
+			setAttribute: vi.fn(),
+		};
+		fileItem.el = element;
+		const adapter = createExplorerAdapter(view);
+
+		expect(adapter.isItemVisible('Welcome.md')).toBe(true);
+		element.getBoundingClientRect = () => ({
+			bottom: 620,
+			left: 0,
+			right: 300,
+			top: 600,
+		});
+		expect(adapter.isItemVisible('Welcome.md')).toBe(false);
+	});
+
+	it('treats items without rendered elements as not visible', () => {
+		const { view } = createView();
+		const adapter = createExplorerAdapter(view);
+
+		expect(adapter.isItemVisible('Welcome.md')).toBe(false);
+		expect(adapter.isItemVisible('Missing.md')).toBe(false);
+	});
+
 	it('expands, collapses, selects, and scrolls to paths', () => {
 		const { folderItem, selected, view } = createView();
 		const adapter = createExplorerAdapter(view);
@@ -314,6 +351,28 @@ describe('createExplorerAdapter', () => {
 			view.fileItems['Welcome.md'],
 			true,
 		);
+		view.navFileContainerEl.getBoundingClientRect = () => ({
+			bottom: 500,
+			left: 0,
+			right: 300,
+			top: 0,
+		});
+		expect(adapter.scrollTo('Welcome.md')).toBe(true);
+		expect(view.tree.infinityScroll.scrollIntoView).toHaveBeenCalledWith(
+			view.fileItems['Welcome.md'],
+			250,
+		);
+	});
+
+	it('uses minimal scroll padding when viewport bounds are unavailable', () => {
+		const { view } = createView();
+		(
+			view.navFileContainerEl as {
+				getBoundingClientRect?: () => unknown;
+			}
+		).getBoundingClientRect = undefined;
+		const adapter = createExplorerAdapter(view);
+
 		expect(adapter.scrollTo('Welcome.md')).toBe(true);
 		expect(view.tree.infinityScroll.scrollIntoView).toHaveBeenCalledWith(
 			view.fileItems['Welcome.md'],

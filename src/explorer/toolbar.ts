@@ -1,31 +1,4 @@
-import type {
-	ExplorerAdapter,
-	ExplorerCompatibilityReport,
-} from './adapter-types';
-
-const PROBE_ACTION = {
-	icon: 'wrench',
-	title: 'Check file explorer compatibility',
-} as const;
-
-export function addCompatibilityAction(
-	adapter: ExplorerAdapter,
-	getRenderCount: () => number,
-	showNotice: (message: string) => void,
-): (() => void) | null {
-	return adapter.addToolbarAction({
-		...PROBE_ACTION,
-		callback: () => {
-			adapter.runOriginalSort();
-			showNotice(
-				formatCompatibilityReport(
-					adapter.getCompatibilityReport(),
-					getRenderCount(),
-				),
-			);
-		},
-	});
-}
+import type { ExplorerCompatibilityReport } from './adapter-types';
 
 export function formatCompatibilityReport(
 	report: ExplorerCompatibilityReport,
