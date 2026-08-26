@@ -64,6 +64,7 @@ export interface ExplorerAdapter {
 	collapse(path: string): boolean;
 	expand(path: string): boolean;
 	getCompatibilityReport(): ExplorerCompatibilityReport;
+	getFocusedPath(): string | null;
 	getItems(): ExplorerItemSnapshot[];
 	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;

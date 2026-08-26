@@ -165,14 +165,24 @@ export class ExplorerController {
 				.map((item) => ({ attached, path: item.path })),
 		);
 		const selectedPaths = [...new Set(selected.map(({ path }) => path))];
-		const path = selectedPaths[0];
+		const focused =
+			selectedPaths.length === 0
+				? [...this.attachedLeaves.values()].flatMap((attached) => {
+						const path = attached.adapter.getFocusedPath();
+						return path === null ? [] : [{ attached, path }];
+					})
+				: [];
+		const focusedPaths = [...new Set(focused.map(({ path }) => path))];
+		const path = selectedPaths[0] ?? focusedPaths[0];
+		const targets = selectedPaths.length === 0 ? focused : selected;
 		if (
-			selectedPaths.length !== 1 ||
+			selectedPaths.length > 1 ||
+			focusedPaths.length > 1 ||
 			path === undefined ||
 			!this.isPinnedPath(path)
 		) {
 			this.showNotice(
-				'File Explorer Tools: select one pinned item in the file explorer.',
+				'File Explorer Tools: focus one pinned item in the file explorer.',
 			);
 			return;
 		}
@@ -191,7 +201,7 @@ export class ExplorerController {
 
 		await this.persistSettings();
 		this.refreshSorting();
-		for (const candidate of selected) {
+		for (const candidate of targets) {
 			if (candidate.path === path) {
 				candidate.attached.adapter.select(path);
 			}

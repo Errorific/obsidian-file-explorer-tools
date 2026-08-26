@@ -114,7 +114,7 @@ Only pinned items have stored positions. A postfix pin marks their state without
 
 Pin membership is managed through direct **Pin** and **Unpin** item context-menu actions when sorting integration is available. Dragging a pinned row over the top or bottom of a pinned sibling places it before or after that sibling. Dropping it on an unpinned sibling in the same parent unpins it. The center third of a folder row, cross-folder targets, blank explorer space, and multi-item drags retain Obsidian's native move behavior.
 
-Commands move the selected pinned item up or down as keyboard and command-palette alternatives. A command requires exactly one pinned explorer item to be selected and reports why it cannot run otherwise.
+Commands move the uniquely selected pinned item, or the focused pinned item when the command palette clears explorer selection. They report why they cannot run when no unambiguous pinned target remains.
 
 Pinned entries survive temporary hiding and temporary global sorting.
 
@@ -182,7 +182,7 @@ Commands remain available separately, including an explicit collapse command.
 ### Accessibility
 
 - Move-pinned-item commands must remain available in the command palette and support user-assigned hotkeys.
-- Move commands must report when there is no unique selected pinned item or when the item cannot move farther.
+- Move commands must report when there is no unambiguous selected or focused pinned item, or when the item cannot move farther.
 - Toolbar toggles must expose pressed state and meaningful tooltips.
 - Hidden state must not be conveyed through opacity alone.
 - Reordering and locating items must preserve useful keyboard focus.

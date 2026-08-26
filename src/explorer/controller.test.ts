@@ -29,6 +29,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 			itemCount: 1,
 			sortMode: 'alphabetical',
 		}));
+	const getFocusedPath = vi.fn(() => null);
 	const getSortMode: ExplorerAdapter['getSortMode'] =
 		vi.fn<ExplorerAdapter['getSortMode']>(() => 'alphabetical');
 	const installPinnedItems: ExplorerAdapter['installPinnedItems'] = vi.fn(
@@ -59,6 +60,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		collapse,
 		expand,
 		getCompatibilityReport,
+		getFocusedPath,
 		getItems: vi.fn(() => []),
 		setItemVisibility: vi.fn(() => true),
 		getSortMode,
@@ -81,6 +83,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		disposePinnedItems,
 		disposeToolbar,
 		expand,
+		getFocusedPath,
 		installPinnedItems,
 		installSorting,
 		isItemVisible,
@@ -805,7 +808,7 @@ describe('ExplorerController', () => {
 		expect(collapse).toHaveBeenCalledWith('Archive');
 	});
 
-	it('moves one selected pinned item through commands', async () => {
+	it('moves the focused pinned item after the command palette clears selection', async () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
 		const pinnedSettings = {
@@ -819,12 +822,13 @@ describe('ExplorerController', () => {
 		const persistSettings = vi.fn(async () => undefined);
 		const showNotice = vi.fn();
 		const { adapter, runOriginalSort, select } = createAdapter({
+			getFocusedPath: vi.fn(() => 'Projects/Second.md'),
 			getItems: vi.fn(() => [
 				{
 					collapsed: null,
 					folder: false,
 					path: 'Projects/Second.md',
-					selected: true,
+					selected: false,
 				},
 			]),
 		});
@@ -879,7 +883,7 @@ describe('ExplorerController', () => {
 		triggerLayoutReady();
 		await controller.moveSelectedPinnedItem(-1);
 		expect(showNotice).toHaveBeenLastCalledWith(
-			'File Explorer Tools: select one pinned item in the file explorer.',
+			'File Explorer Tools: focus one pinned item in the file explorer.',
 		);
 
 		getItems.mockReturnValue([
@@ -898,7 +902,7 @@ describe('ExplorerController', () => {
 		]);
 		await controller.moveSelectedPinnedItem(-1);
 		expect(showNotice).toHaveBeenLastCalledWith(
-			'File Explorer Tools: select one pinned item in the file explorer.',
+			'File Explorer Tools: focus one pinned item in the file explorer.',
 		);
 
 		getItems.mockReturnValue([

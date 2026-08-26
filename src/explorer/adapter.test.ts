@@ -123,6 +123,18 @@ describe('createExplorerAdapter', () => {
 		]);
 	});
 
+	it('reads the explorer focused item path', () => {
+		const { fileItem, view } = createView();
+		const tree = view.tree as typeof view.tree & {
+			focusedItem?: FakeItem;
+		};
+		const adapter = createExplorerAdapter(view);
+
+		expect(adapter.getFocusedPath()).toBeNull();
+		tree.focusedItem = fileItem;
+		expect(adapter.getFocusedPath()).toBe('Welcome.md');
+	});
+
 	it('reports incompatible structures without throwing', () => {
 		const adapter = createExplorerAdapter({});
 
@@ -142,6 +154,7 @@ describe('createExplorerAdapter', () => {
 			itemCount: 0,
 			sortMode: null,
 		});
+		expect(adapter.getFocusedPath()).toBeNull();
 		expect(adapter.getItems()).toEqual([]);
 		expect(adapter.runOriginalSort()).toBe(false);
 		expect(adapter.expand('Projects')).toBe(false);

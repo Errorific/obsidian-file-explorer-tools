@@ -25,6 +25,7 @@ interface InternalExplorerItem {
 
 interface InternalExplorerTree {
 	clearSelectedDoms?: UnknownFunction;
+	focusedItem?: InternalExplorerItem;
 	infinityScroll?: {
 		scrollIntoView?: UnknownFunction;
 	};
@@ -213,6 +214,16 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			itemCount: items?.length ?? 0,
 			sortMode: this.getSortMode(),
 		};
+	}
+
+	getFocusedPath(): string | null {
+		const focusedItem = this.view.tree?.focusedItem;
+		if (focusedItem === undefined) {
+			return null;
+		}
+		return (
+			this.readItems()?.find((item) => item.value === focusedItem)?.path ?? null
+		);
 	}
 
 	getItems(): ExplorerItemSnapshot[] {
