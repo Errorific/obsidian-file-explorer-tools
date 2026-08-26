@@ -206,6 +206,7 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 		const options = vi.mocked(installPinnedItems).mock.calls[0]?.[0];
+		expect(controller.isPinningAvailable()).toBe(true);
 		expect(options?.isPinned('Projects/First.md')).toBe(true);
 		expect(options?.isPinned('Projects/Other.md')).toBe(false);
 		expect(options?.isInteractionEnabled()).toBe(true);
@@ -218,6 +219,7 @@ describe('ExplorerController', () => {
 		expect(refreshPinnedItems).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
+		expect(controller.isPinningAvailable()).toBe(false);
 		expect(disposePinnedItems).toHaveBeenCalledOnce();
 	});
 
@@ -236,6 +238,7 @@ describe('ExplorerController', () => {
 		triggerLayoutReady();
 
 		expect(installPinnedItems).not.toHaveBeenCalled();
+		expect(controller.isPinningAvailable()).toBe(false);
 	});
 
 	it('persists pinned reordering and drag-to-unpin', async () => {
@@ -249,12 +252,13 @@ describe('ExplorerController', () => {
 				},
 			},
 		};
-		const saveSettings = vi.fn(async () => undefined);
-		const { adapter, installPinnedItems, select } = createAdapter();
+		const persistSettings = vi.fn(async () => undefined);
+		const { adapter, installPinnedItems, runOriginalSort, select } =
+			createAdapter();
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
 			getSettings: () => pinnedSettings,
-			saveSettings,
+			persistSettings,
 			showNotice: vi.fn(),
 		});
 
@@ -273,7 +277,8 @@ describe('ExplorerController', () => {
 			'First.md',
 			'Second.md',
 		]);
-		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(persistSettings).toHaveBeenCalledOnce();
+		expect(runOriginalSort).toHaveBeenCalledTimes(2);
 		expect(select).toHaveBeenCalledWith('Projects/Third.md');
 
 		expect(await options?.onUnpin('Projects/First.md')).toBe(true);
@@ -281,7 +286,8 @@ describe('ExplorerController', () => {
 			'Third.md',
 			'Second.md',
 		]);
-		expect(saveSettings).toHaveBeenCalledTimes(2);
+		expect(persistSettings).toHaveBeenCalledTimes(2);
+		expect(runOriginalSort).toHaveBeenCalledTimes(3);
 		expect(select).toHaveBeenCalledWith('Projects/First.md');
 		expect(
 			await options?.onReorder({
@@ -290,7 +296,7 @@ describe('ExplorerController', () => {
 				targetPath: 'Archive/Other.md',
 			}),
 		).toBe(false);
-		expect(saveSettings).toHaveBeenCalledTimes(2);
+		expect(persistSettings).toHaveBeenCalledTimes(2);
 	});
 
 	it('attaches added leaves and disposes removed leaves', () => {
@@ -810,9 +816,9 @@ describe('ExplorerController', () => {
 				},
 			},
 		};
-		const saveSettings = vi.fn(async () => undefined);
+		const persistSettings = vi.fn(async () => undefined);
 		const showNotice = vi.fn();
-		const { adapter, select } = createAdapter({
+		const { adapter, runOriginalSort, select } = createAdapter({
 			getItems: vi.fn(() => [
 				{
 					collapsed: null,
@@ -825,7 +831,7 @@ describe('ExplorerController', () => {
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
 			getSettings: () => pinnedSettings,
-			saveSettings,
+			persistSettings,
 			showNotice,
 		});
 
@@ -838,7 +844,8 @@ describe('ExplorerController', () => {
 			'First.md',
 			'Third.md',
 		]);
-		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(persistSettings).toHaveBeenCalledOnce();
+		expect(runOriginalSort).toHaveBeenCalledTimes(2);
 		expect(select).toHaveBeenCalledWith('Projects/Second.md');
 		expect(showNotice).not.toHaveBeenCalled();
 	});

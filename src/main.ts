@@ -32,7 +32,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.addSettingTab(new FileExplorerToolsSettingsTab(this.app, this));
 		this.explorerController = new ExplorerController(this, {
 			getSettings: () => this.settings,
-			saveSettings: () => this.saveSettings(),
+			persistSettings: () => this.saveData(this.settings),
 			showNotice: (message) => new Notice(message),
 			folderNotes: {
 				getAssociatedFolderPath: (file) =>
@@ -74,6 +74,10 @@ export default class FileExplorerToolsPlugin extends Plugin {
 			}),
 		);
 		this.explorerController.start();
+	}
+
+	isPinningAvailable(): boolean {
+		return this.explorerController?.isPinningAvailable() ?? false;
 	}
 
 	onunload(): void {

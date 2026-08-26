@@ -51,7 +51,7 @@ export interface ExplorerPluginHost {
 export interface ExplorerControllerOptions {
 	createAdapter?: (view: unknown) => ExplorerAdapter;
 	getSettings?: () => FileExplorerToolsSettings;
-	saveSettings?: () => Promise<void>;
+	persistSettings?: () => Promise<void>;
 	showNotice: (message: string) => void;
 	folderNotes?: FolderNoteIntegration | null;
 }
@@ -60,13 +60,14 @@ interface AttachedExplorer {
 	adapter: ExplorerAdapter;
 	state: ExplorerLeafState;
 	dispose: () => void;
+	pinningAvailable: boolean;
 }
 
 export class ExplorerController {
 	private readonly attachedLeaves = new Map<ExplorerLeaf, AttachedExplorer>();
 	private readonly createAdapter: (view: unknown) => ExplorerAdapter;
 	private readonly getSettings: () => FileExplorerToolsSettings;
-	private readonly saveSettings: () => Promise<void>;
+	private readonly persistSettings: () => Promise<void>;
 	private readonly showNotice: (message: string) => void;
 	private readonly folderNotes: FolderNoteIntegration | null;
 	private disposed = false;
@@ -79,7 +80,7 @@ export class ExplorerController {
 	) {
 		this.createAdapter = options.createAdapter ?? createExplorerAdapter;
 		this.getSettings = options.getSettings ?? (() => DEFAULT_SETTINGS);
-		this.saveSettings = options.saveSettings ?? (async () => undefined);
+		this.persistSettings = options.persistSettings ?? (async () => undefined);
 		this.showNotice = options.showNotice;
 		this.folderNotes = options.folderNotes ?? null;
 	}
@@ -127,6 +128,12 @@ export class ExplorerController {
 
 	isForceGlobal(): boolean {
 		return this.forceGlobal;
+	}
+
+	isPinningAvailable(): boolean {
+		return [...this.attachedLeaves.values()].some(
+			(attached) => attached.pinningAvailable,
+		);
 	}
 
 	refreshSorting(): void {
@@ -182,7 +189,8 @@ export class ExplorerController {
 			return;
 		}
 
-		await this.saveSettings();
+		await this.persistSettings();
+		this.refreshSorting();
 		for (const candidate of selected) {
 			if (candidate.path === path) {
 				candidate.attached.adapter.select(path);
@@ -294,6 +302,7 @@ export class ExplorerController {
 			adapter,
 			state: createLeafState(),
 			dispose: () => runDisposers(disposers),
+			pinningAvailable: false,
 		};
 		try {
 			const disposeSorting = adapter.installSorting((folderPath, coreSortMode) =>
@@ -314,6 +323,7 @@ export class ExplorerController {
 				});
 				if (disposePinnedItems !== null) {
 					disposers.push(disposePinnedItems);
+					attached.pinningAvailable = true;
 				}
 			}
 
@@ -410,7 +420,8 @@ export class ExplorerController {
 		if (!changed) {
 			return false;
 		}
-		await this.saveSettings();
+		await this.persistSettings();
+		this.refreshSorting();
 		attached.adapter.select(request.sourcePath);
 		return true;
 	}
@@ -423,7 +434,8 @@ export class ExplorerController {
 			return false;
 		}
 		unpinItem(this.getSettings(), parentOf(path), nameOf(path));
-		await this.saveSettings();
+		await this.persistSettings();
+		this.refreshSorting();
 		attached.adapter.select(path);
 		return true;
 	}

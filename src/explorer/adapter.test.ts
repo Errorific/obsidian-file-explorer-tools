@@ -192,6 +192,40 @@ describe('createExplorerAdapter', () => {
 		expect(view.getSortedFolderItems(folder)).toEqual(wrappers);
 	});
 
+	it('normalizes the vault root path before reading sorting options', () => {
+		const { view } = createView();
+		const folder = {
+			path: '/',
+			children: [
+				{
+					path: 'Alpha.md',
+					name: 'Alpha.md',
+					stat: { ctime: 10, mtime: 10 },
+				},
+				{
+					path: 'Zulu.md',
+					name: 'Zulu.md',
+					stat: { ctime: 20, mtime: 20 },
+				},
+			],
+		};
+		const wrappers = folder.children.map((file) => ({ file }));
+		view.getSortedFolderItems.mockImplementation(() => wrappers);
+		const adapter = createExplorerAdapter(view);
+		const getOptions = vi.fn((folderPath: string) => ({
+			mixFilesAndFolders: true,
+			prefixPositions: new Map(folderPath === '' ? [['Zulu.md', 0]] : []),
+			sortMode: 'name-ascending' as const,
+		}));
+		adapter.installSorting(getOptions);
+
+		expect(view.getSortedFolderItems(folder)).toEqual([
+			wrappers[1],
+			wrappers[0],
+		]);
+		expect(getOptions).toHaveBeenCalledWith('', 'alphabetical');
+	});
+
 	it('sorts files using their basenames', () => {
 		const { view } = createView();
 		const folder = {

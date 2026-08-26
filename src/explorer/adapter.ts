@@ -277,7 +277,11 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		const controller = new PinnedItemController(
 			container,
 			document,
-			() => this.readItems() ?? [],
+			() =>
+				(this.readItems() ?? []).map((item) => ({
+					...item,
+					selected: this.view.tree?.selectedDoms?.has?.(item.value) ?? false,
+				})),
 			options,
 		);
 		this.pinnedItems = controller;
@@ -498,7 +502,7 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		getOptions: SortingOptionsProvider,
 	): unknown {
 		const coreSortMode = this.getSortMode();
-		const folderPath = readPath(folder);
+		const folderPath = normalizeFolderPath(readPath(folder));
 		if (!isUnknownArray(result) || coreSortMode === null || folderPath === null) {
 			return result;
 		}
@@ -551,6 +555,7 @@ interface RenderedPinnedItem {
 	folder: boolean;
 	path: string;
 	row: HTMLElement;
+	selected: boolean;
 }
 
 type PinnedDropAction =
@@ -558,6 +563,7 @@ type PinnedDropAction =
 	| { sourcePath: string; targetPath: string; type: 'unpin' };
 
 class PinnedItemController {
+	private readonly decoratedRows = new Set<HTMLElement>();
 	private readonly indicators = new Map<string, PinnedIndicatorEntry>();
 	private readonly renderedItems = new Map<string, RenderedPinnedItem>();
 	private itemsByRow = new WeakMap<HTMLElement, RenderedPinnedItem>();
@@ -569,6 +575,7 @@ class PinnedItemController {
 		private readonly document: Document,
 		private readonly readItems: () => Array<{
 			path: string;
+			selected: boolean;
 			value: InternalExplorerItem;
 		}>,
 		private readonly options: PinnedItemOptions,
@@ -579,6 +586,7 @@ class PinnedItemController {
 		this.container.addEventListener('dragover', this.onDragOver, true);
 		this.container.addEventListener('drop', this.onDrop, true);
 		this.container.addEventListener('dragend', this.onDragEnd, true);
+		this.container.addEventListener('dragleave', this.onDragLeave, true);
 	}
 
 	dispose(): void {
@@ -587,6 +595,7 @@ class PinnedItemController {
 		this.container.removeEventListener('dragover', this.onDragOver, true);
 		this.container.removeEventListener('drop', this.onDrop, true);
 		this.container.removeEventListener('dragend', this.onDragEnd, true);
+		this.container.removeEventListener('dragleave', this.onDragLeave, true);
 		this.clearDrag();
 		for (const entry of this.indicators.values()) {
 			entry.dispose();
@@ -601,6 +610,7 @@ class PinnedItemController {
 			return;
 		}
 
+		this.clearDropClasses();
 		this.renderedItems.clear();
 		this.itemsByRow = new WeakMap();
 		const retainedPaths = new Set<string>();
@@ -613,6 +623,7 @@ class PinnedItemController {
 				folder: typeof item.value.setCollapsed === 'function',
 				path: item.path,
 				row,
+				selected: item.selected,
 			};
 			this.renderedItems.set(item.path, rendered);
 			this.itemsByRow.set(row, rendered);
@@ -647,14 +658,20 @@ class PinnedItemController {
 			return;
 		}
 		const item = this.findEventItem(event.target);
-		if (item === null || !this.options.isPinned(item.path)) {
+		if (
+			item === null ||
+			!this.options.isPinned(item.path) ||
+			(item.selected && this.selectedItemCount() > 1)
+		) {
 			return;
 		}
 		this.draggingPath = item.path;
-		item.row.classList.add('file-explorer-tools-pinned-dragging');
 	};
 
 	private readonly onDragOver = (event: DragEvent): void => {
+		if (this.draggingPath === null) {
+			return;
+		}
 		const action = this.getDropAction(event);
 		this.updateDropClasses(action);
 		if (action === null) {
@@ -682,12 +699,17 @@ class PinnedItemController {
 		this.clearDrag();
 	};
 
+	private readonly onDragLeave = (event: DragEvent): void => {
+		if (!isNodeWithin(this.container, event.relatedTarget)) {
+			this.clearDropClasses();
+		}
+	};
+
 	private addIndicator(row: HTMLElement): PinnedIndicatorEntry {
 		const indicator = this.document.createElement('span');
 		indicator.classList.add('file-explorer-tools-pin-indicator');
 		indicator.draggable = false;
 		indicator.setAttribute('aria-hidden', 'true');
-		indicator.setAttribute('title', 'Pinned');
 		row.setAttribute('data-file-explorer-tools-pinned', 'true');
 		row.insertBefore(indicator, null);
 		return {
@@ -763,27 +785,33 @@ class PinnedItemController {
 	}
 
 	private updateDropClasses(action: PinnedDropAction | null): void {
-		for (const item of this.renderedItems.values()) {
-			item.row.classList.toggle(
-				'file-explorer-tools-pinned-will-unpin',
-				action?.type === 'unpin' && action.sourcePath === item.path,
+		this.clearDropClasses();
+		if (action === null) {
+			return;
+		}
+		if (action.type === 'reorder') {
+			const target = this.renderedItems.get(action.request.targetPath)?.row;
+			if (target === undefined) {
+				return;
+			}
+			target.classList.add(
+				action.request.position === 'before'
+					? 'file-explorer-tools-pin-drop-before'
+					: 'file-explorer-tools-pin-drop-after',
 			);
-			item.row.classList.toggle(
-				'file-explorer-tools-pin-drop-before',
-				action?.type === 'reorder' &&
-					action.request.targetPath === item.path &&
-					action.request.position === 'before',
-			);
-			item.row.classList.toggle(
-				'file-explorer-tools-pin-drop-after',
-				action?.type === 'reorder' &&
-					action.request.targetPath === item.path &&
-					action.request.position === 'after',
-			);
-			item.row.classList.toggle(
-				'file-explorer-tools-pin-drop-unpin',
-				action?.type === 'unpin' && action.targetPath === item.path,
-			);
+			this.decoratedRows.add(target);
+			return;
+		}
+
+		const source = this.renderedItems.get(action.sourcePath)?.row;
+		const target = this.renderedItems.get(action.targetPath)?.row;
+		if (source !== undefined) {
+			source.classList.add('file-explorer-tools-pinned-will-unpin');
+			this.decoratedRows.add(source);
+		}
+		if (target !== undefined) {
+			target.classList.add('file-explorer-tools-pin-drop-unpin');
+			this.decoratedRows.add(target);
 		}
 	}
 
@@ -799,11 +827,20 @@ class PinnedItemController {
 		}
 	}
 
-	private clearDrag(): void {
-		for (const item of this.renderedItems.values()) {
-			item.row.classList.remove('file-explorer-tools-pinned-dragging');
-			clearPinnedDropClasses(item.row);
+	private selectedItemCount(): number {
+		return [...this.renderedItems.values()].filter((item) => item.selected)
+			.length;
+	}
+
+	private clearDropClasses(): void {
+		for (const row of this.decoratedRows) {
+			clearPinnedDropClasses(row);
 		}
+		this.decoratedRows.clear();
+	}
+
+	private clearDrag(): void {
+		this.clearDropClasses();
 		this.draggingPath = null;
 	}
 }
@@ -1011,6 +1048,10 @@ function readPath(value: unknown): string | null {
 	return isRecord(value) && typeof value.path === 'string' ? value.path : null;
 }
 
+function normalizeFolderPath(path: string | null): string | null {
+	return path === '/' ? '' : path;
+}
+
 function readTimestamp(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -1044,6 +1085,10 @@ function hasFolderControls(
 
 function isCoreSortMode(value: unknown): value is CoreSortMode {
 	return CORE_SORT_MODES.some((mode) => mode === value);
+}
+
+function isNodeWithin(container: HTMLElement, value: unknown): boolean {
+	return isNode(value) && container.contains(value);
 }
 
 function isNode(value: unknown): value is Node {

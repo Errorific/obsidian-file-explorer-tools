@@ -112,7 +112,7 @@ Templates
 
 Only pinned items have stored positions. A postfix pin marks their state without changing the explorer row height.
 
-Pin membership is managed through direct **Pin** and **Unpin** item context-menu actions. Dragging a pinned row over the top or bottom of a pinned sibling places it before or after that sibling. Dropping it on an unpinned sibling in the same parent unpins it. The center third of a folder row, cross-folder targets, and blank explorer space retain Obsidian's native move behavior.
+Pin membership is managed through direct **Pin** and **Unpin** item context-menu actions when sorting integration is available. Dragging a pinned row over the top or bottom of a pinned sibling places it before or after that sibling. Dropping it on an unpinned sibling in the same parent unpins it. The center third of a folder row, cross-folder targets, blank explorer space, and multi-item drags retain Obsidian's native move behavior.
 
 Commands move the selected pinned item up or down as keyboard and command-palette alternatives. A command requires exactly one pinned explorer item to be selected and reports why it cannot run otherwise.
 

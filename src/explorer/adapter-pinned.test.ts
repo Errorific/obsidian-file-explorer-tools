@@ -169,15 +169,21 @@ interface FakeDragEvent {
 	clientY: number;
 	dataTransfer: { dropEffect: string } | null;
 	preventDefault: ReturnType<typeof vi.fn>;
+	relatedTarget: FakeElement | null;
 	stopPropagation: ReturnType<typeof vi.fn>;
 	target: FakeElement;
 }
 
-function createDragEvent(target: FakeElement, clientY: number): FakeDragEvent {
+function createDragEvent(
+	target: FakeElement,
+	clientY: number,
+	relatedTarget: FakeElement | null = null,
+): FakeDragEvent {
 	return {
 		clientY,
 		dataTransfer: { dropEffect: 'none' },
 		preventDefault: vi.fn(),
+		relatedTarget,
 		stopPropagation: vi.fn(),
 		target,
 	};
@@ -217,6 +223,7 @@ function createView() {
 	]) {
 		container.appendChild(item.row);
 	}
+	const selected = new Set<unknown>();
 	const view = {
 		fileItems: {
 			'Projects/First.md': {
@@ -244,6 +251,7 @@ function createView() {
 		},
 		navFileContainerEl: container,
 		sortOrder: 'alphabetical',
+		tree: { selectedDoms: selected },
 	};
 	return {
 		container,
@@ -251,6 +259,7 @@ function createView() {
 		otherParentTarget,
 		ordinaryTarget,
 		pinnedTarget,
+		selected,
 		source,
 		view,
 	};
@@ -301,7 +310,6 @@ describe('explorer pinned item interactions', () => {
 		const indicator = findIndicator(source.row);
 		expect(indicator).not.toBeNull();
 		expect(indicator?.getAttribute('aria-hidden')).toBe('true');
-		expect(indicator?.getAttribute('title')).toBe('Pinned');
 		expect(source.row.children.at(-1)).toBe(indicator);
 		expect(findIndicator(pinnedTarget.row)).not.toBeNull();
 
@@ -431,6 +439,30 @@ describe('explorer pinned item interactions', () => {
 		expect(onReorder).not.toHaveBeenCalled();
 	});
 
+	it('clears drop indicators when the pointer leaves the explorer', () => {
+		const { container, pinnedTarget, source, view } = createView();
+		installPinnedItems(view);
+		container.dispatch('dragstart', createDragEvent(source.content, 15));
+		container.dispatch(
+			'dragover',
+			createDragEvent(pinnedTarget.content, 32),
+		);
+		expect(
+			pinnedTarget.row.classList.contains(
+				'file-explorer-tools-pin-drop-before',
+			),
+		).toBe(true);
+
+		const outside = new FakeElement(source.row.ownerDocument, 'div');
+		container.dispatch('dragleave', createDragEvent(container, 0, outside));
+
+		expect(
+			pinnedTarget.row.classList.contains(
+				'file-explorer-tools-pin-drop-before',
+			),
+		).toBe(false);
+	});
+
 	it('preserves native folder-center drops', async () => {
 		const { container, folderTarget, source, view } = createView();
 		const { onReorder, onUnpin } = installPinnedItems(view);
@@ -467,12 +499,47 @@ describe('explorer pinned item interactions', () => {
 		expect(onUnpin).not.toHaveBeenCalled();
 	});
 
+	it('leaves ordinary source drags untouched', async () => {
+		const { container, ordinaryTarget, pinnedTarget, view } = createView();
+		const { onReorder, onUnpin } = installPinnedItems(view);
+		container.dispatch(
+			'dragstart',
+			createDragEvent(ordinaryTarget.content, 75),
+		);
+		const dragOver = createDragEvent(pinnedTarget.content, 32);
+		container.dispatch('dragover', dragOver);
+		const drop = createDragEvent(pinnedTarget.content, 32);
+		container.dispatch('drop', drop);
+		await Promise.resolve();
+
+		expect(dragOver.preventDefault).not.toHaveBeenCalled();
+		expect(drop.preventDefault).not.toHaveBeenCalled();
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onUnpin).not.toHaveBeenCalled();
+	});
+
 	it('keeps status indicators but disables custom drops during forced sorting', async () => {
 		const { container, pinnedTarget, source, view } = createView();
 		const { onReorder, onUnpin } = installPinnedItems(view, {
 			isInteractionEnabled: () => false,
 		});
 		expect(findIndicator(source.row)).not.toBeNull();
+
+		container.dispatch('dragstart', createDragEvent(source.content, 15));
+		const drop = createDragEvent(pinnedTarget.content, 32);
+		container.dispatch('drop', drop);
+		await Promise.resolve();
+
+		expect(drop.preventDefault).not.toHaveBeenCalled();
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onUnpin).not.toHaveBeenCalled();
+	});
+
+	it('preserves native multi-selection drags', async () => {
+		const { container, pinnedTarget, selected, source, view } = createView();
+		selected.add(view.fileItems['Projects/First.md']);
+		selected.add(view.fileItems['Projects/Second.md']);
+		const { onReorder, onUnpin } = installPinnedItems(view);
 
 		container.dispatch('dragstart', createDragEvent(source.content, 15));
 		const drop = createDragEvent(pinnedTarget.content, 32);

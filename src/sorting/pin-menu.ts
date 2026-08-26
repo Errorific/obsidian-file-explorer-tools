@@ -11,6 +11,7 @@ interface PinMenuHost {
 			): EventRef;
 		};
 	};
+	isPinningAvailable(): boolean;
 	registerEvent(event: EventRef): void;
 	saveSettings(): Promise<void>;
 	settings: FileExplorerToolsSettings;
@@ -19,7 +20,9 @@ interface PinMenuHost {
 export function registerPinMenu(host: PinMenuHost): void {
 	host.registerEvent(
 		host.app.workspace.on('file-menu', (menu, file) => {
-			addPinMenu(menu, file.path, host);
+			if (host.isPinningAvailable()) {
+				addPinMenu(menu, file.path, host);
+			}
 		}),
 	);
 }
@@ -30,7 +33,7 @@ export function addPinMenu(
 	host: Pick<PinMenuHost, 'saveSettings' | 'settings'>,
 ): void {
 	const itemName = nameOf(path);
-	if (itemName === null) {
+	if (itemName === null || itemName.length === 0) {
 		return;
 	}
 
