@@ -4,6 +4,7 @@ import {
 	addPrefixItem,
 	movePrefixItem,
 	removePrefixItem,
+	reorderPrefixItem,
 } from './prefix-controller';
 
 describe('ordered-prefix settings', () => {
@@ -34,6 +35,87 @@ describe('ordered-prefix settings', () => {
 			'Second.md',
 		]);
 		expect(movePrefixItem(settings, 'Projects', 'First.md', -1)).toBe(false);
+	});
+
+	it('reorders an item before or after another prefix item', () => {
+		const settings = loadSettings({
+			folders: {
+				Projects: {
+					orderedPrefix: ['First.md', 'Second.md', 'Third.md'],
+				},
+			},
+		});
+
+		expect(
+			reorderPrefixItem(
+				settings,
+				'Projects',
+				'Third.md',
+				'First.md',
+				'before',
+			),
+		).toBe(true);
+		expect(settings.folders.Projects?.orderedPrefix).toEqual([
+			'Third.md',
+			'First.md',
+			'Second.md',
+		]);
+		expect(
+			reorderPrefixItem(
+				settings,
+				'Projects',
+				'Third.md',
+				'Second.md',
+				'after',
+			),
+		).toBe(true);
+		expect(settings.folders.Projects?.orderedPrefix).toEqual([
+			'First.md',
+			'Second.md',
+			'Third.md',
+		]);
+	});
+
+	it('rejects invalid and unchanged reorder requests', () => {
+		const settings = loadSettings({
+			folders: {
+				Projects: {
+					orderedPrefix: ['First.md', 'Second.md'],
+				},
+			},
+		});
+
+		expect(
+			reorderPrefixItem(
+				settings,
+				'Projects',
+				'First.md',
+				'Second.md',
+				'before',
+			),
+		).toBe(false);
+		expect(
+			reorderPrefixItem(
+				settings,
+				'Projects',
+				'First.md',
+				'Missing.md',
+				'after',
+			),
+		).toBe(false);
+		expect(
+			reorderPrefixItem(
+				settings,
+				'Missing',
+				'First.md',
+				'Second.md',
+				'after',
+			),
+		).toBe(false);
+		expect(settings.folders.Projects?.orderedPrefix).toEqual([
+			'First.md',
+			'Second.md',
+		]);
 	});
 
 	it('removes an empty configuration but preserves sort overrides', () => {

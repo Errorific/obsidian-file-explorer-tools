@@ -29,7 +29,12 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		}));
 	const getSortMode: ExplorerAdapter['getSortMode'] =
 		vi.fn<ExplorerAdapter['getSortMode']>(() => 'alphabetical');
+	const installPrefixHandles: ExplorerAdapter['installPrefixHandles'] = vi.fn(
+		() => vi.fn(),
+	);
 	const installSorting: ExplorerAdapter['installSorting'] = vi.fn(() => vi.fn());
+	const refreshPrefixHandles = vi.fn();
+	const restorePrefixHandleFocus = vi.fn();
 	const runOriginalSort: ExplorerAdapter['runOriginalSort'] = vi.fn(() => true);
 	const addToolbarAction: ExplorerAdapter['addToolbarAction'] = vi.fn(
 		(action: ToolbarAction) => {
@@ -51,10 +56,13 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		getItems: vi.fn(() => []),
 		setItemVisibility: vi.fn(() => true),
 		getSortMode,
+		installPrefixHandles,
 		installSorting,
 		isItemVisible,
 		observeRenders: vi.fn(() => disposeObserver),
+		refreshPrefixHandles,
 		refreshToolbarActions,
+		restorePrefixHandleFocus,
 		runOriginalSort,
 		scrollTo,
 		select,
@@ -67,9 +75,12 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		disposeObserver,
 		disposeToolbar,
 		expand,
+		installPrefixHandles,
 		installSorting,
 		isItemVisible,
+		refreshPrefixHandles,
 		refreshToolbarActions,
+		restorePrefixHandleFocus,
 		runOriginalSort,
 		scrollTo,
 		select,

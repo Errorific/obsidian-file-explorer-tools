@@ -39,6 +39,19 @@ export interface ToolbarAction {
 	getPressed?: () => boolean;
 }
 
+export type PrefixDropPosition = 'before' | 'after';
+
+export interface PrefixReorderRequest {
+	sourcePath: string;
+	targetPath: string;
+	position: PrefixDropPosition;
+}
+
+export interface PrefixHandleOptions {
+	isOrdered(path: string): boolean;
+	onReorder(request: PrefixReorderRequest): boolean | Promise<boolean>;
+}
+
 export type SortingOptionsProvider = (
 	folderPath: string,
 	coreSortMode: CoreSortMode,
@@ -52,10 +65,13 @@ export interface ExplorerAdapter {
 	getItems(): ExplorerItemSnapshot[];
 	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;
+	installPrefixHandles(options: PrefixHandleOptions): (() => void) | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	isItemVisible(path: string): boolean;
 	observeRenders(callback: () => void): (() => void) | null;
+	refreshPrefixHandles(): void;
 	refreshToolbarActions(): void;
+	restorePrefixHandleFocus(path: string): void;
 	runOriginalSort(): boolean;
 	scrollTo(path: string): boolean;
 	select(path: string): boolean;
