@@ -1,5 +1,6 @@
-import type { EventRef, Menu, MenuItem, TAbstractFile } from 'obsidian';
+import type { EventRef, Menu, TAbstractFile } from 'obsidian';
 import type { FileExplorerToolsSettings, SortMode } from '../settings';
+import { getSubmenu } from '../ui/menu';
 
 interface FolderSortMenuHost {
 	app: {
@@ -74,28 +75,6 @@ function addSortChoices(
 				});
 		});
 	}
-}
-
-function getSubmenu(item: MenuItem): Menu | null {
-	const value: unknown = item;
-	if (!isRecord(value) || typeof value.setSubmenu !== 'function') {
-		return null;
-	}
-
-	try {
-		const submenu: unknown = Reflect.apply(value.setSubmenu, value, []);
-		return isMenu(submenu) ? submenu : null;
-	} catch {
-		return null;
-	}
-}
-
-function isMenu(value: unknown): value is Menu {
-	return isRecord(value) && typeof value.addItem === 'function';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
 }
 
 export function setFolderSortMode(
