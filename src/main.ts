@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, type WorkspaceLeaf } from 'obsidian';
 import { registerCommands } from './commands/register';
 import { ExplorerController } from './explorer/controller';
 import {
@@ -82,8 +82,8 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.explorerController = null;
 	}
 
-	restorePrefixHandleFocus(path: string): void {
-		this.explorerController?.restorePrefixHandleFocus(path);
+	restorePrefixHandleFocus(path: string, leaf?: WorkspaceLeaf): void {
+		this.explorerController?.restorePrefixHandleFocus(path, leaf);
 	}
 
 	async saveSettings(): Promise<void> {

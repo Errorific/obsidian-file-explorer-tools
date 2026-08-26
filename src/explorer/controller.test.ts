@@ -222,6 +222,23 @@ describe('ExplorerController', () => {
 		expect(disposePrefixHandles).toHaveBeenCalledOnce();
 	});
 
+	it('does not install handles when custom sorting is unavailable', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const { adapter, installPrefixHandles } = createAdapter({
+			installSorting: vi.fn(() => null),
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+
+		expect(installPrefixHandles).not.toHaveBeenCalled();
+	});
+
 	it('persists handle reordering and restores handle focus', async () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
@@ -263,10 +280,12 @@ describe('ExplorerController', () => {
 		]);
 		expect(saveSettings).toHaveBeenCalledOnce();
 
-		controller.restorePrefixHandleFocus('Projects/Third.md');
+		controller.restorePrefixHandleFocus('Projects/Third.md', leaf);
 		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
 			'Projects/Third.md',
 		);
+		controller.restorePrefixHandleFocus('Projects/Third.md');
+		expect(restorePrefixHandleFocus).toHaveBeenCalledOnce();
 		expect(
 			await options?.onReorder({
 				position: 'after',

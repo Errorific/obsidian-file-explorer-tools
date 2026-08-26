@@ -1,4 +1,9 @@
-import type { EventRef, Menu, TAbstractFile } from 'obsidian';
+import type {
+	EventRef,
+	Menu,
+	TAbstractFile,
+	WorkspaceLeaf,
+} from 'obsidian';
 import type { FileExplorerToolsSettings } from '../settings';
 import { getSubmenu } from '../ui/menu';
 import {
@@ -12,20 +17,25 @@ interface PrefixMenuHost {
 		workspace: {
 			on(
 				name: 'file-menu',
-				callback: (menu: Menu, file: TAbstractFile) => void,
+				callback: (
+					menu: Menu,
+					file: TAbstractFile,
+					source: string,
+					leaf?: WorkspaceLeaf,
+				) => void,
 			): EventRef;
 		};
 	};
 	registerEvent(event: EventRef): void;
-	restorePrefixHandleFocus(path: string): void;
+	restorePrefixHandleFocus(path: string, leaf?: WorkspaceLeaf): void;
 	saveSettings(): Promise<void>;
 	settings: FileExplorerToolsSettings;
 }
 
 export function registerPrefixMenu(host: PrefixMenuHost): void {
 	host.registerEvent(
-		host.app.workspace.on('file-menu', (menu, file) => {
-			addPrefixMenu(menu, file.path, host);
+		host.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
+			addPrefixMenu(menu, file.path, host, leaf);
 		}),
 	);
 }
@@ -37,6 +47,7 @@ export function addPrefixMenu(
 		PrefixMenuHost,
 		'restorePrefixHandleFocus' | 'saveSettings' | 'settings'
 	>,
+	leaf?: WorkspaceLeaf,
 ): void {
 	const itemName = nameOf(path);
 	if (itemName === null) {
@@ -61,7 +72,7 @@ export function addPrefixMenu(
 			item.setTitle('Add to ordered prefix').onClick(async () => {
 				addPrefixItem(host.settings, folderPath, itemName);
 				await host.saveSettings();
-				host.restorePrefixHandleFocus(path);
+				host.restorePrefixHandleFocus(path, leaf);
 			});
 		});
 		return;
@@ -77,6 +88,7 @@ export function addPrefixMenu(
 		actionMenu,
 		host,
 		path,
+		leaf,
 		folderPath,
 		itemName,
 		'Move up',
@@ -87,6 +99,7 @@ export function addPrefixMenu(
 		actionMenu,
 		host,
 		path,
+		leaf,
 		folderPath,
 		itemName,
 		'Move down',
@@ -102,6 +115,7 @@ function addMoveAction(
 		'restorePrefixHandleFocus' | 'saveSettings' | 'settings'
 	>,
 	path: string,
+	leaf: WorkspaceLeaf | undefined,
 	folderPath: string,
 	itemName: string,
 	title: string,
@@ -115,7 +129,7 @@ function addMoveAction(
 			.onClick(async () => {
 				if (movePrefixItem(host.settings, folderPath, itemName, offset)) {
 					await host.saveSettings();
-					host.restorePrefixHandleFocus(path);
+					host.restorePrefixHandleFocus(path, leaf);
 				}
 			});
 	});

@@ -139,10 +139,11 @@ export class ExplorerController {
 		}
 	}
 
-	restorePrefixHandleFocus(path: string): void {
-		for (const attached of this.attachedLeaves.values()) {
-			attached.adapter.restorePrefixHandleFocus(path);
+	restorePrefixHandleFocus(path: string, leaf?: ExplorerLeaf): void {
+		if (leaf === undefined) {
+			return;
 		}
+		this.attachedLeaves.get(leaf)?.adapter.restorePrefixHandleFocus(path);
 	}
 
 	moveTemporaryVisibility(oldPath: string, newPath: string): void {
@@ -261,14 +262,13 @@ export class ExplorerController {
 			);
 			if (disposeSorting !== null) {
 				disposers.push(disposeSorting);
-			}
-
-			const disposePrefixHandles = adapter.installPrefixHandles({
-				isOrdered: (path) => this.isOrderedPrefixPath(path),
-				onReorder: (request) => this.reorderPrefix(request),
-			});
-			if (disposePrefixHandles !== null) {
-				disposers.push(disposePrefixHandles);
+				const disposePrefixHandles = adapter.installPrefixHandles({
+					isOrdered: (path) => this.isOrderedPrefixPath(path),
+					onReorder: (request) => this.reorderPrefix(request),
+				});
+				if (disposePrefixHandles !== null) {
+					disposers.push(disposePrefixHandles);
+				}
 			}
 
 			let renderCount = 0;

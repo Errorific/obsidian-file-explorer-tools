@@ -1,4 +1,4 @@
-import type { Menu } from 'obsidian';
+import type { Menu, WorkspaceLeaf } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { loadSettings } from '../settings';
 import { addPrefixMenu } from './prefix-menu';
@@ -75,14 +75,20 @@ describe('addPrefixMenu', () => {
 	it('adds an item to its parent ordered prefix', async () => {
 		const { items, menu, submenuItems } = createMenu();
 		const settings = loadSettings(undefined);
+		const leaf = { view: {} } as unknown as WorkspaceLeaf;
 		const restorePrefixHandleFocus = vi.fn();
 		const saveSettings = vi.fn(async () => undefined);
 
-		addPrefixMenu(menu, 'Projects/Current.md', {
-			restorePrefixHandleFocus,
-			saveSettings,
-			settings,
-		});
+		addPrefixMenu(
+			menu,
+			'Projects/Current.md',
+			{
+				restorePrefixHandleFocus,
+				saveSettings,
+				settings,
+			},
+			leaf,
+		);
 
 		expect(items).toHaveLength(1);
 		expect(items[0]).toMatchObject({
@@ -100,6 +106,7 @@ describe('addPrefixMenu', () => {
 		expect(saveSettings).toHaveBeenCalledOnce();
 		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
 			'Projects/Current.md',
+			leaf,
 		);
 	});
 
@@ -144,14 +151,20 @@ describe('addPrefixMenu', () => {
 				},
 			},
 		});
+		const leaf = { view: {} } as unknown as WorkspaceLeaf;
 		const restorePrefixHandleFocus = vi.fn();
 		const saveSettings = vi.fn(async () => undefined);
 
-		addPrefixMenu(menu, 'Projects/Second.md', {
-			restorePrefixHandleFocus,
-			saveSettings,
-			settings,
-		});
+		addPrefixMenu(
+			menu,
+			'Projects/Second.md',
+			{
+				restorePrefixHandleFocus,
+				saveSettings,
+				settings,
+			},
+			leaf,
+		);
 
 		expect(submenuItems[1]).toMatchObject({ disabled: false, title: 'Move up' });
 		expect(submenuItems[2]).toMatchObject({ disabled: false, title: 'Move down' });
@@ -164,14 +177,20 @@ describe('addPrefixMenu', () => {
 		expect(saveSettings).toHaveBeenCalledOnce();
 		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
 			'Projects/Second.md',
+			leaf,
 		);
 
 		const first = createMenu();
-		addPrefixMenu(first.menu, 'Projects/Second.md', {
-			restorePrefixHandleFocus,
-			saveSettings,
-			settings,
-		});
+		addPrefixMenu(
+			first.menu,
+			'Projects/Second.md',
+			{
+				restorePrefixHandleFocus,
+				saveSettings,
+				settings,
+			},
+			leaf,
+		);
 		expect(first.submenuItems[1]).toMatchObject({ disabled: true, title: 'Move up' });
 		expect(first.submenuItems[2]).toMatchObject({
 			disabled: false,
