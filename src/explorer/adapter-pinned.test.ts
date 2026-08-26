@@ -358,6 +358,7 @@ describe('explorer pinned item interactions', () => {
 			}),
 		).toBeNull();
 		expect(container.listeners.get('dragstart')?.size).toBe(0);
+		expect(container.listeners.get('dragenter')?.size).toBe(0);
 		expect(adapter.getCompatibilityReport().unavailableCapabilities).toContain(
 			'add pinned item interactions',
 		);
@@ -439,7 +440,7 @@ describe('explorer pinned item interactions', () => {
 		container.dispatch('dragstart', createDragEvent(source.content, 15));
 
 		const beforeDrag = createDragEvent(folderTarget.content, 92);
-		container.dispatch('dragover', beforeDrag);
+		container.dispatch('dragenter', beforeDrag);
 		expect(beforeDrag.preventDefault).toHaveBeenCalledOnce();
 		expect(view.lastDropTargetEl).toBeNull();
 		expect(
@@ -449,6 +450,11 @@ describe('explorer pinned item interactions', () => {
 		).toBe(true);
 
 		view.lastDropTargetEl = { native: true };
+		const titleBottomDrag = createDragEvent(folderTarget.content, 118);
+		container.dispatch('dragover', titleBottomDrag);
+		expect(titleBottomDrag.preventDefault).not.toHaveBeenCalled();
+		expect(view.lastDropTargetEl).toEqual({ native: true });
+
 		const afterDrag = createDragEvent(folderChild.content, 148);
 		container.dispatch('dragover', afterDrag);
 		expect(afterDrag.preventDefault).toHaveBeenCalledOnce();
@@ -460,6 +466,33 @@ describe('explorer pinned item interactions', () => {
 		).toBe(true);
 
 		container.dispatch('drop', createDragEvent(folderChild.content, 148));
+		await vi.waitFor(() => {
+			expect(onReorder).toHaveBeenCalledWith({
+				position: 'after',
+				sourcePath: 'Projects/First.md',
+				targetPath: 'Projects/Destination',
+			});
+		});
+	});
+
+	it('keeps the bottom-third after zone for collapsed folders', async () => {
+		const { container, folderContainer, folderTarget, source, view } =
+			createView();
+		folderContainer.setBounds(90, 120);
+		view.fileItems['Projects/Destination'].collapsed = true;
+		const { onReorder } = installPinnedItems(view);
+		container.dispatch('dragstart', createDragEvent(source.content, 15));
+
+		const dragOver = createDragEvent(folderTarget.content, 118);
+		container.dispatch('dragover', dragOver);
+		expect(dragOver.preventDefault).toHaveBeenCalledOnce();
+		expect(
+			folderContainer.classList.contains(
+				'file-explorer-tools-pin-drop-after',
+			),
+		).toBe(true);
+
+		container.dispatch('drop', createDragEvent(folderTarget.content, 118));
 		await vi.waitFor(() => {
 			expect(onReorder).toHaveBeenCalledWith({
 				position: 'after',

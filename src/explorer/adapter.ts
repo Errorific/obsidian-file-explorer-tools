@@ -584,6 +584,7 @@ class PinnedItemController {
 	private readonly indicators = new Map<string, PinnedIndicatorEntry>();
 	private readonly renderedItems = new Map<string, RenderedPinnedItem>();
 	private itemsByRow = new WeakMap<HTMLElement, RenderedPinnedItem>();
+	private folderAfterCandidates: RenderedPinnedItem[] = [];
 	private draggingPath: string | null = null;
 	private disposed = false;
 
@@ -688,6 +689,14 @@ class PinnedItemController {
 			return;
 		}
 		this.draggingPath = item.path;
+		const sourceParent = parentOf(item.path);
+		this.folderAfterCandidates = [...this.renderedItems.values()].filter(
+			(candidate) =>
+				candidate.folder &&
+				candidate.path !== item.path &&
+				parentOf(candidate.path) === sourceParent &&
+				this.options.isPinned(candidate.path),
+		);
 	};
 
 	private readonly onDragOver = (event: DragEvent): void => {
@@ -781,10 +790,13 @@ class PinnedItemController {
 		}
 
 		const relativeY = event.clientY - bounds.top;
+		const afterBounds = target.folder ? readBounds(target.afterElement) : null;
+		const expandedFolder =
+			afterBounds !== null && afterBounds.bottom > bounds.bottom + 1;
 		if (
 			target.folder &&
 			relativeY >= bounds.height / 3 &&
-			relativeY <= (bounds.height * 2) / 3
+			(relativeY <= (bounds.height * 2) / 3 || expandedFolder)
 		) {
 			return null;
 		}
@@ -809,15 +821,8 @@ class PinnedItemController {
 		if (eventElement === null) {
 			return null;
 		}
-		const sourceParent = parentOf(sourcePath);
-		for (const item of this.renderedItems.values()) {
-			if (
-				!item.folder ||
-				item.path === sourcePath ||
-				parentOf(item.path) !== sourceParent ||
-				!this.options.isPinned(item.path) ||
-				!item.afterElement.contains(eventElement)
-			) {
+		for (const item of this.folderAfterCandidates) {
+			if (!item.afterElement.contains(eventElement)) {
 				continue;
 			}
 			const bounds = readBounds(item.afterElement);
@@ -916,6 +921,7 @@ class PinnedItemController {
 
 	private clearDrag(): void {
 		this.clearDropClasses();
+		this.folderAfterCandidates = [];
 		this.draggingPath = null;
 	}
 }
