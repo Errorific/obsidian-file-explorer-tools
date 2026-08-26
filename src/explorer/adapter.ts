@@ -280,7 +280,8 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 			() =>
 				(this.readItems() ?? []).map((item) => ({
 					...item,
-					selected: this.view.tree?.selectedDoms?.has?.(item.value) ?? false,
+					isSelected: () =>
+						this.view.tree?.selectedDoms?.has?.(item.value) ?? false,
 				})),
 			options,
 		);
@@ -553,9 +554,9 @@ interface PinnedIndicatorEntry {
 
 interface RenderedPinnedItem {
 	folder: boolean;
+	isSelected(): boolean;
 	path: string;
 	row: HTMLElement;
-	selected: boolean;
 }
 
 type PinnedDropAction =
@@ -574,8 +575,8 @@ class PinnedItemController {
 		private readonly container: HTMLElement,
 		private readonly document: Document,
 		private readonly readItems: () => Array<{
+			isSelected(): boolean;
 			path: string;
-			selected: boolean;
 			value: InternalExplorerItem;
 		}>,
 		private readonly options: PinnedItemOptions,
@@ -621,9 +622,9 @@ class PinnedItemController {
 			}
 			const rendered = {
 				folder: typeof item.value.setCollapsed === 'function',
+				isSelected: () => item.isSelected(),
 				path: item.path,
 				row,
-				selected: item.selected,
 			};
 			this.renderedItems.set(item.path, rendered);
 			this.itemsByRow.set(row, rendered);
@@ -661,7 +662,7 @@ class PinnedItemController {
 		if (
 			item === null ||
 			!this.options.isPinned(item.path) ||
-			(item.selected && this.selectedItemCount() > 1)
+			(item.isSelected() && this.selectedItemCount() > 1)
 		) {
 			return;
 		}
@@ -828,7 +829,7 @@ class PinnedItemController {
 	}
 
 	private selectedItemCount(): number {
-		return [...this.renderedItems.values()].filter((item) => item.selected)
+		return [...this.renderedItems.values()].filter((item) => item.isSelected())
 			.length;
 	}
 

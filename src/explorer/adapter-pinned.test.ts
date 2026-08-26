@@ -535,20 +535,29 @@ describe('explorer pinned item interactions', () => {
 		expect(onUnpin).not.toHaveBeenCalled();
 	});
 
-	it('preserves native multi-selection drags', async () => {
+	it('reads multi-selection state when the drag starts', async () => {
 		const { container, pinnedTarget, selected, source, view } = createView();
+		const { onReorder, onUnpin } = installPinnedItems(view);
 		selected.add(view.fileItems['Projects/First.md']);
 		selected.add(view.fileItems['Projects/Second.md']);
-		const { onReorder, onUnpin } = installPinnedItems(view);
 
 		container.dispatch('dragstart', createDragEvent(source.content, 15));
-		const drop = createDragEvent(pinnedTarget.content, 32);
-		container.dispatch('drop', drop);
+		const nativeDrop = createDragEvent(pinnedTarget.content, 32);
+		container.dispatch('drop', nativeDrop);
 		await Promise.resolve();
 
-		expect(drop.preventDefault).not.toHaveBeenCalled();
+		expect(nativeDrop.preventDefault).not.toHaveBeenCalled();
 		expect(onReorder).not.toHaveBeenCalled();
 		expect(onUnpin).not.toHaveBeenCalled();
+
+		selected.clear();
+		container.dispatch('dragstart', createDragEvent(source.content, 15));
+		const reorderDrop = createDragEvent(pinnedTarget.content, 32);
+		container.dispatch('drop', reorderDrop);
+		await vi.waitFor(() => {
+			expect(onReorder).toHaveBeenCalledOnce();
+		});
+		expect(reorderDrop.preventDefault).toHaveBeenCalledOnce();
 	});
 
 	it('does not alter native row drag listeners', () => {
