@@ -347,6 +347,62 @@ describe('ExplorerController', () => {
 		});
 	});
 
+	it('temporarily reveals a hidden folder associated with the active note', () => {
+		const activeFile = createFile('Projects/Active.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const hiddenSettings = {
+			...settings,
+			hiddenPaths: ['Projects', 'Projects/Active'],
+		};
+		const setItemVisibility = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			getItems: vi.fn(() => [
+				{
+					path: 'Projects',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+				{
+					path: activeFile.path,
+					folder: false,
+					collapsed: null,
+					selected: true,
+				},
+			]),
+			setItemVisibility,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			folderNotes: { getAssociatedFolderPath: () => 'Projects/Active' },
+			getSettings: () => hiddenSettings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+
+		expect(setItemVisibility).toHaveBeenCalledWith('Projects', {
+			hidden: true,
+			showHidden: true,
+			dimmed: true,
+			marked: true,
+		});
+		expect(setItemVisibility).toHaveBeenCalledWith('Projects/Active', {
+			hidden: true,
+			showHidden: true,
+			dimmed: true,
+			marked: true,
+		});
+	});
+
 	it('dims the visible subtree of a revealed hidden folder', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);

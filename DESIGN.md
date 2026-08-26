@@ -298,7 +298,7 @@ Folder Notes integration is feature-detected behind a narrow interface:
 
 ```ts
 interface FolderNoteIntegration {
-	getAssociatedFolder(file: TFile): TFolder | null;
+	getAssociatedFolderPath(file: TFile): string | null;
 }
 ```
 
@@ -431,7 +431,9 @@ Status: Implemented and manually verified against Obsidian 1.13.7.
 
 ### Phase 6: Folder Notes integration
 
-Initial adjacent-note reveal support is implemented as part of hiding. The Folder Notes project research established that its plugin ID is `folder-notes`, its relevant settings are `folderNoteName` and `storageLocation`, and `parentFolder` notes map to `<parent path>/<folder name>`. Folder Notes explorer items may expose `selfEl` or `titleEl` rather than `el`; the explorer adapter supports all three fields. Full Folder Notes integration remains scheduled for this phase.
+Status: Implemented and manually verified with Folder Notes 1.8.26.
+
+The guarded integration reads the enabled `folder-notes` plugin's `folderNoteName` and `storageLocation` settings. It supports current `insideFolder` and `parentFolder` storage modes, fixed inside-folder names, and names containing one `{{folder_name}}` marker. Associations are accepted only when the derived folder exists. Unsupported or malformed settings fall back to ordinary note behavior. Folder Notes explorer items may expose `selfEl` or `titleEl` rather than `el`; the explorer adapter supports all three fields.
 
 - Read Folder Notes settings through a guarded adapter
 - Support its naming and storage modes
@@ -496,8 +498,11 @@ Every implementation phase must meet these criteria before it is considered comp
 
 - Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
 - Follow-up research found no supported user-interface action for opening a second built-in file explorer. Obsidian core requests `getLeavesOfType("file-explorer")` and uses the first result, creating a left-sidebar leaf with `setViewState({ type: "file-explorer" })` only when none exists. A plugin can attempt to assign the view type to another leaf, but coexistence and workspace persistence for multiple built-in explorers are undocumented and unverified.
-- Folder Notes stores adjacent notes using `storageLocation: 'parentFolder'` and derives the associated folder from `folderNoteName`, commonly `{{folder_name}}`.
+- Folder Notes stores notes using `storageLocation: 'insideFolder'` or `storageLocation: 'parentFolder'` and derives names from `folderNoteName`, commonly `{{folder_name}}`. Its source retains a `vaultFolder` settings value that is absent from the current settings UI and cannot unambiguously associate nested folders, so the integration fails open for that value.
+- Folder Notes supports fixed note names when notes are stored inside their associated folders. Parent-folder storage requires a `{{folder_name}}` marker to derive the adjacent folder.
 - Folder Notes decorates explorer entries through `fileItems[path].selfEl` or `titleEl` and uses classes including `has-folder-note` and `is-folder-note`. File Explorer Tools preserves these classes by changing only its own classes.
+- Manual Folder Notes verification covered adjacent and fixed-name inside-folder notes, temporary reveal of hidden associated folders, associated-subtree preservation, unrelated-folder collapse, click-to-open behavior, and clean console output.
+- Folder Notes 1.8.26 does not reliably restore click-to-open behavior when it is disabled and re-enabled in an already-open vault. The issue begins when Folder Notes alone is toggled, persists after File Explorer Tools is disabled, and clears after restarting the vault.
 - Manual verification covered hiding, reveal styling, rerenders, vault changes, persistence, Folder Notes adjacent notes, plugin reload/disable, and console cleanliness.
 - Navigation verification covered hidden-path reveal, ancestor expansion, selection, centered scrolling, second-click collapse, off-screen relocalization, explicit collapse commands, Folder Notes subtree preservation, command-driven reveal mode, and toolbar cleanup across disable and re-enable.
 
