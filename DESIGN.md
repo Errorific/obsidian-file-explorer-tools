@@ -445,7 +445,7 @@ The guarded integration reads the enabled `folder-notes` plugin's `folderNoteNam
 
 ### Phase 7: Pinned-item interaction
 
-Status: Redesigned implementation and automated verification complete. Manual Obsidian verification is pending.
+Status: Implemented and manually verified against Obsidian 1.13.7 with Folder Notes 1.8.26.
 
 Pinned items use a compact postfix status marker and direct **Pin** or **Unpin** context-menu actions. Desktop reordering uses the explorer row's native drag source. Capture-phase handlers intercept only same-parent reorder and unpin zones, while folder-center, cross-folder, and blank-space drops continue to Obsidian's native move handlers. A folder's after-position and indicator sit below its expanded subtree, and custom before/after zones suppress Obsidian's native hover expansion. Force-global sorting keeps pin markers visible but disables custom drops and move commands.
 
@@ -504,6 +504,7 @@ Every implementation phase must meet these criteria before it is considered comp
 
 ## Research notes
 
+- Phase 7 manual verification covered root and nested pinning, direct Pin and Unpin menus, postfix marker layout, command-palette movement and notices, force-global behavior, expanded and collapsed folder boundaries, native expansion suppression, drag-to-unpin, native folder moves with retained pin state, Folder Notes click behavior, and clean console output.
 - Flexplorer 4.0.5 uses native desktop drag events, capture-phase drop handling, pointer proximity for sibling insertion, a center folder drop zone, and a postfix pin indicator. It prevents every drop and performs moves through `fileManager.renameFile()`. File Explorer Tools adopts the narrow event and drop-zone observations but intercepts only same-parent pin operations so Obsidian remains responsible for native folder and vault-root moves.
 - Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
 - Follow-up research found no supported user-interface action for opening a second built-in file explorer. Obsidian core requests `getLeavesOfType("file-explorer")` and uses the first result, creating a left-sidebar leaf with `setViewState({ type: "file-explorer" })` only when none exists. A plugin can attempt to assign the view type to another leaf, but coexistence and workspace persistence for multiple built-in explorers are undocumented and unverified.
