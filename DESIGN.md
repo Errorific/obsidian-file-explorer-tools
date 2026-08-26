@@ -443,6 +443,10 @@ The guarded integration reads the enabled `folder-notes` plugin's `folderNoteNam
 
 ### Phase 7: Ordered-prefix interaction
 
+Status: Implementation and automated verification complete. Manual Obsidian verification is pending.
+
+Ordered-prefix actions appear in an **Ordered prefix** context submenu, with a flat fallback for Obsidian versions that do not support submenus. Prefix items receive persistent, keyboard-focusable reorder handles that use pointer events for mouse, pen, and touch input. Drops over the upper or lower half of another prefix item insert before or after it. Handles accept only same-parent prefix targets, restore focus after a successful reorder, and remain hidden while force-global sorting is active.
+
 - Add context-menu prefix controls
 - Render dedicated drag handles
 - Reorder only within a single parent
