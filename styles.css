@@ -10,6 +10,34 @@ If your plugin does not need CSS, delete this file.
 	display: none;
 }
 
+.file-explorer-tools-pin-indicator {
+	background-color: var(--text-muted);
+	flex: 0 0 auto;
+	height: 1em;
+	margin-left: auto;
+	margin-right: 0.25em;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M5 17h14'/%3E%3Cpath d='M6 17v-5l2-2V5h8v5l2 2v5'/%3E%3C/svg%3E") center / contain no-repeat;
+	opacity: 0.55;
+	pointer-events: none;
+	width: 1em;
+}
+
+.file-explorer-tools-pinned-will-unpin .file-explorer-tools-pin-indicator {
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M5 17h14'/%3E%3Cpath d='M6 17v-5l2-2V5h8v5l2 2v5'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.file-explorer-tools-pin-drop-before {
+	box-shadow: inset 0 2px 0 var(--interactive-accent);
+}
+
+.file-explorer-tools-pin-drop-after {
+	box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+.file-explorer-tools-pin-drop-unpin {
+	box-shadow: inset 0 0 0 1px var(--text-muted);
+}
+
 .file-explorer-tools-hidden-revealed.nav-file-title,
 .file-explorer-tools-hidden-revealed.nav-folder-title,
 .file-explorer-tools-hidden-revealed > .nav-file-title,

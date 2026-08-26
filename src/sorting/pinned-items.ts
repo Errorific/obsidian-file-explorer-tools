@@ -1,6 +1,6 @@
 import type { FileExplorerToolsSettings } from '../settings';
 
-export function addPrefixItem(
+export function pinItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,
@@ -12,7 +12,38 @@ export function addPrefixItem(
 	}
 }
 
-export function removePrefixItem(
+export function reorderPinnedItem(
+	settings: FileExplorerToolsSettings,
+	folderPath: string,
+	itemName: string,
+	targetName: string,
+	position: 'before' | 'after',
+): boolean {
+	const prefix = settings.folders[folderPath]?.orderedPrefix;
+	if (prefix === undefined) {
+		return false;
+	}
+
+	const currentIndex = prefix.indexOf(itemName);
+	const targetIndex = prefix.indexOf(targetName);
+	if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) {
+		return false;
+	}
+
+	const reordered = prefix.filter((name) => name !== itemName);
+	const adjustedTargetIndex = reordered.indexOf(targetName);
+	const insertionIndex =
+		position === 'before' ? adjustedTargetIndex : adjustedTargetIndex + 1;
+	reordered.splice(insertionIndex, 0, itemName);
+	if (reordered.every((name, index) => name === prefix[index])) {
+		return false;
+	}
+
+	settings.folders[folderPath]!.orderedPrefix = reordered;
+	return true;
+}
+
+export function unpinItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,
@@ -30,7 +61,7 @@ export function removePrefixItem(
 	}
 }
 
-export function movePrefixItem(
+export function movePinnedItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,

@@ -39,6 +39,21 @@ export interface ToolbarAction {
 	getPressed?: () => boolean;
 }
 
+export type PinnedDropPosition = 'before' | 'after';
+
+export interface PinnedReorderRequest {
+	sourcePath: string;
+	targetPath: string;
+	position: PinnedDropPosition;
+}
+
+export interface PinnedItemOptions {
+	isInteractionEnabled(): boolean;
+	isPinned(path: string): boolean;
+	onReorder(request: PinnedReorderRequest): boolean | Promise<boolean>;
+	onUnpin(path: string): boolean | Promise<boolean>;
+}
+
 export type SortingOptionsProvider = (
 	folderPath: string,
 	coreSortMode: CoreSortMode,
@@ -49,12 +64,15 @@ export interface ExplorerAdapter {
 	collapse(path: string): boolean;
 	expand(path: string): boolean;
 	getCompatibilityReport(): ExplorerCompatibilityReport;
+	getFocusedPath(): string | null;
 	getItems(): ExplorerItemSnapshot[];
 	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;
+	installPinnedItems(options: PinnedItemOptions): (() => void) | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	isItemVisible(path: string): boolean;
 	observeRenders(callback: () => void): (() => void) | null;
+	refreshPinnedItems(): void;
 	refreshToolbarActions(): void;
 	runOriginalSort(): boolean;
 	scrollTo(path: string): boolean;

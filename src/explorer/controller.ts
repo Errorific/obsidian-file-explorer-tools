@@ -10,11 +10,19 @@ import {
 } from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
 import {
+	movePinnedItem,
+	reorderPinnedItem,
+	unpinItem,
+} from '../sorting/pinned-items';
+import {
 	getAncestorFolderPaths,
 	getFoldersToCollapse,
 } from '../navigation/path-state';
 import { createExplorerAdapter } from './adapter';
-import type { ExplorerAdapter } from './adapter-types';
+import type {
+	ExplorerAdapter,
+	PinnedReorderRequest,
+} from './adapter-types';
 import { formatCompatibilityReport } from './toolbar';
 
 const FILE_EXPLORER_VIEW_TYPE = 'file-explorer';
@@ -43,6 +51,7 @@ export interface ExplorerPluginHost {
 export interface ExplorerControllerOptions {
 	createAdapter?: (view: unknown) => ExplorerAdapter;
 	getSettings?: () => FileExplorerToolsSettings;
+	persistSettings?: () => Promise<void>;
 	showNotice: (message: string) => void;
 	folderNotes?: FolderNoteIntegration | null;
 }
@@ -51,12 +60,14 @@ interface AttachedExplorer {
 	adapter: ExplorerAdapter;
 	state: ExplorerLeafState;
 	dispose: () => void;
+	pinningAvailable: boolean;
 }
 
 export class ExplorerController {
 	private readonly attachedLeaves = new Map<ExplorerLeaf, AttachedExplorer>();
 	private readonly createAdapter: (view: unknown) => ExplorerAdapter;
 	private readonly getSettings: () => FileExplorerToolsSettings;
+	private readonly persistSettings: () => Promise<void>;
 	private readonly showNotice: (message: string) => void;
 	private readonly folderNotes: FolderNoteIntegration | null;
 	private disposed = false;
@@ -69,6 +80,7 @@ export class ExplorerController {
 	) {
 		this.createAdapter = options.createAdapter ?? createExplorerAdapter;
 		this.getSettings = options.getSettings ?? (() => DEFAULT_SETTINGS);
+		this.persistSettings = options.persistSettings ?? (async () => undefined);
 		this.showNotice = options.showNotice;
 		this.folderNotes = options.folderNotes ?? null;
 	}
@@ -118,9 +130,16 @@ export class ExplorerController {
 		return this.forceGlobal;
 	}
 
+	isPinningAvailable(): boolean {
+		return [...this.attachedLeaves.values()].some(
+			(attached) => attached.pinningAvailable,
+		);
+	}
+
 	refreshSorting(): void {
 		for (const attached of this.attachedLeaves.values()) {
 			attached.adapter.runOriginalSort();
+			attached.adapter.refreshPinnedItems();
 			this.applyVisibility(attached);
 		}
 	}
@@ -128,6 +147,64 @@ export class ExplorerController {
 	refreshVisibility(): void {
 		for (const attached of this.attachedLeaves.values()) {
 			this.applyVisibility(attached);
+		}
+	}
+
+	async moveSelectedPinnedItem(offset: -1 | 1): Promise<void> {
+		if (this.forceGlobal) {
+			this.showNotice(
+				'File Explorer Tools: disable force global sorting to move pinned items.',
+			);
+			return;
+		}
+
+		const selected = [...this.attachedLeaves.values()].flatMap((attached) =>
+			attached.adapter
+				.getItems()
+				.filter((item) => item.selected)
+				.map((item) => ({ attached, path: item.path })),
+		);
+		const selectedPaths = [...new Set(selected.map(({ path }) => path))];
+		const focused =
+			selectedPaths.length === 0
+				? [...this.attachedLeaves.values()].flatMap((attached) => {
+						const path = attached.adapter.getFocusedPath();
+						return path === null ? [] : [{ attached, path }];
+					})
+				: [];
+		const focusedPaths = [...new Set(focused.map(({ path }) => path))];
+		const path = selectedPaths[0] ?? focusedPaths[0];
+		const targets = selectedPaths.length === 0 ? focused : selected;
+		if (
+			selectedPaths.length > 1 ||
+			focusedPaths.length > 1 ||
+			path === undefined ||
+			!this.isPinnedPath(path)
+		) {
+			this.showNotice(
+				'File Explorer Tools: focus one pinned item in the file explorer.',
+			);
+			return;
+		}
+
+		if (
+			!movePinnedItem(
+				this.getSettings(),
+				parentOf(path),
+				nameOf(path),
+				offset,
+			)
+		) {
+			this.showNotice('File Explorer Tools: pinned item cannot move further.');
+			return;
+		}
+
+		await this.persistSettings();
+		this.refreshSorting();
+		for (const candidate of targets) {
+			if (candidate.path === path) {
+				candidate.attached.adapter.select(path);
+			}
 		}
 	}
 
@@ -235,6 +312,7 @@ export class ExplorerController {
 			adapter,
 			state: createLeafState(),
 			dispose: () => runDisposers(disposers),
+			pinningAvailable: false,
 		};
 		try {
 			const disposeSorting = adapter.installSorting((folderPath, coreSortMode) =>
@@ -247,11 +325,22 @@ export class ExplorerController {
 			);
 			if (disposeSorting !== null) {
 				disposers.push(disposeSorting);
+				const disposePinnedItems = adapter.installPinnedItems({
+					isInteractionEnabled: () => !this.forceGlobal,
+					isPinned: (path) => this.isPinnedPath(path),
+					onReorder: (request) => this.applyPinnedReorder(attached, request),
+					onUnpin: (path) => this.unpinDroppedItem(attached, path),
+				});
+				if (disposePinnedItems !== null) {
+					disposers.push(disposePinnedItems);
+					attached.pinningAvailable = true;
+				}
 			}
 
 			let renderCount = 0;
 			const disposeRenderObserver = adapter.observeRenders(() => {
 				renderCount += 1;
+				adapter.refreshPinnedItems();
 				this.applyVisibility(attached);
 			});
 			if (disposeRenderObserver !== null) {
@@ -307,6 +396,58 @@ export class ExplorerController {
 		}
 
 		return attached;
+	}
+
+	private isPinnedPath(path: string): boolean {
+		if (path.length === 0) {
+			return false;
+		}
+		const folderPath = parentOf(path);
+		return (
+			this.getSettings().folders[folderPath]?.orderedPrefix.includes(
+				nameOf(path),
+			) ?? false
+		);
+	}
+
+	private async applyPinnedReorder(
+		attached: AttachedExplorer,
+		request: PinnedReorderRequest,
+	): Promise<boolean> {
+		if (
+			this.forceGlobal ||
+			parentOf(request.sourcePath) !== parentOf(request.targetPath)
+		) {
+			return false;
+		}
+		const changed = reorderPinnedItem(
+			this.getSettings(),
+			parentOf(request.sourcePath),
+			nameOf(request.sourcePath),
+			nameOf(request.targetPath),
+			request.position,
+		);
+		if (!changed) {
+			return false;
+		}
+		await this.persistSettings();
+		this.refreshSorting();
+		attached.adapter.select(request.sourcePath);
+		return true;
+	}
+
+	private async unpinDroppedItem(
+		attached: AttachedExplorer,
+		path: string,
+	): Promise<boolean> {
+		if (this.forceGlobal || !this.isPinnedPath(path)) {
+			return false;
+		}
+		unpinItem(this.getSettings(), parentOf(path), nameOf(path));
+		await this.persistSettings();
+		this.refreshSorting();
+		attached.adapter.select(path);
+		return true;
 	}
 
 	private collapseAttachedExplorer(
@@ -377,6 +518,16 @@ export class ExplorerController {
 			this.applyVisibility(attached);
 		}
 	}
+}
+
+function parentOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? '' : path.slice(0, separatorIndex);
+}
+
+function nameOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? path : path.slice(separatorIndex + 1);
 }
 
 function isPathOrDescendant(path: string, ancestor: string): boolean {
