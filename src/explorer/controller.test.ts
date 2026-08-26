@@ -19,7 +19,7 @@ const settings: FileExplorerToolsSettings = {
 function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 	const actions: ToolbarAction[] = [];
 	const disposeObserver = vi.fn();
-	const disposePrefixHandles = vi.fn();
+	const disposePinnedItems = vi.fn();
 	const disposeToolbar = vi.fn();
 	let renderCallback: (() => void) | null = null;
 	const getCompatibilityReport: ExplorerAdapter['getCompatibilityReport'] =
@@ -31,8 +31,8 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		}));
 	const getSortMode: ExplorerAdapter['getSortMode'] =
 		vi.fn<ExplorerAdapter['getSortMode']>(() => 'alphabetical');
-	const installPrefixHandles: ExplorerAdapter['installPrefixHandles'] = vi.fn(
-		() => disposePrefixHandles,
+	const installPinnedItems: ExplorerAdapter['installPinnedItems'] = vi.fn(
+		() => disposePinnedItems,
 	);
 	const installSorting: ExplorerAdapter['installSorting'] = vi.fn(() => vi.fn());
 	const observeRenders: ExplorerAdapter['observeRenders'] =
@@ -40,8 +40,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 			renderCallback = callback;
 			return disposeObserver;
 		});
-	const refreshPrefixHandles = vi.fn();
-	const restorePrefixHandleFocus = vi.fn();
+	const refreshPinnedItems = vi.fn();
 	const runOriginalSort: ExplorerAdapter['runOriginalSort'] = vi.fn(() => true);
 	const addToolbarAction: ExplorerAdapter['addToolbarAction'] = vi.fn(
 		(action: ToolbarAction) => {
@@ -63,13 +62,12 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		getItems: vi.fn(() => []),
 		setItemVisibility: vi.fn(() => true),
 		getSortMode,
-		installPrefixHandles,
+		installPinnedItems,
 		installSorting,
 		isItemVisible,
 		observeRenders,
-		refreshPrefixHandles,
+		refreshPinnedItems,
 		refreshToolbarActions,
-		restorePrefixHandleFocus,
 		runOriginalSort,
 		scrollTo,
 		select,
@@ -80,15 +78,14 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		adapter,
 		collapse,
 		disposeObserver,
-		disposePrefixHandles,
+		disposePinnedItems,
 		disposeToolbar,
 		expand,
-		installPrefixHandles,
+		installPinnedItems,
 		installSorting,
 		isItemVisible,
-		refreshPrefixHandles,
+		refreshPinnedItems,
 		refreshToolbarActions,
-		restorePrefixHandleFocus,
 		runOriginalSort,
 		scrollTo,
 		select,
@@ -184,10 +181,10 @@ describe('ExplorerController', () => {
 		expect(disposeObserver).toHaveBeenCalledOnce();
 	});
 
-	it('installs, refreshes, and disposes prefix handles for each leaf', () => {
+	it('installs, refreshes, and disposes pinned item interactions for each leaf', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
-		const prefixSettings = {
+		const pinnedSettings = {
 			...settings,
 			folders: {
 				Projects: { orderedPrefix: ['First.md'] },
@@ -195,37 +192,39 @@ describe('ExplorerController', () => {
 		};
 		const {
 			adapter,
-			disposePrefixHandles,
-			installPrefixHandles,
-			refreshPrefixHandles,
+			disposePinnedItems,
+			installPinnedItems,
+			refreshPinnedItems,
 			triggerRender,
 		} = createAdapter();
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
-			getSettings: () => prefixSettings,
+			getSettings: () => pinnedSettings,
 			showNotice: vi.fn(),
 		});
 
 		controller.start();
 		triggerLayoutReady();
-		const options = vi.mocked(installPrefixHandles).mock.calls[0]?.[0];
-		expect(options?.isOrdered('Projects/First.md')).toBe(true);
-		expect(options?.isOrdered('Projects/Other.md')).toBe(false);
+		const options = vi.mocked(installPinnedItems).mock.calls[0]?.[0];
+		expect(options?.isPinned('Projects/First.md')).toBe(true);
+		expect(options?.isPinned('Projects/Other.md')).toBe(false);
+		expect(options?.isInteractionEnabled()).toBe(true);
 
 		triggerRender();
-		expect(refreshPrefixHandles).toHaveBeenCalledOnce();
+		expect(refreshPinnedItems).toHaveBeenCalledOnce();
 		controller.toggleForceGlobal();
-		expect(options?.isOrdered('Projects/First.md')).toBe(false);
-		expect(refreshPrefixHandles).toHaveBeenCalledTimes(2);
+		expect(options?.isPinned('Projects/First.md')).toBe(true);
+		expect(options?.isInteractionEnabled()).toBe(false);
+		expect(refreshPinnedItems).toHaveBeenCalledTimes(2);
 
 		controller.dispose();
-		expect(disposePrefixHandles).toHaveBeenCalledOnce();
+		expect(disposePinnedItems).toHaveBeenCalledOnce();
 	});
 
-	it('does not install handles when custom sorting is unavailable', () => {
+	it('does not install pinned interactions when custom sorting is unavailable', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
-		const { adapter, installPrefixHandles } = createAdapter({
+		const { adapter, installPinnedItems } = createAdapter({
 			installSorting: vi.fn(() => null),
 		});
 		const controller = new ExplorerController(host, {
@@ -236,13 +235,13 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(installPrefixHandles).not.toHaveBeenCalled();
+		expect(installPinnedItems).not.toHaveBeenCalled();
 	});
 
-	it('persists handle reordering and restores handle focus', async () => {
+	it('persists pinned reordering and drag-to-unpin', async () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
-		const prefixSettings = {
+		const pinnedSettings = {
 			...settings,
 			folders: {
 				Projects: {
@@ -251,21 +250,17 @@ describe('ExplorerController', () => {
 			},
 		};
 		const saveSettings = vi.fn(async () => undefined);
-		const {
-			adapter,
-			installPrefixHandles,
-			restorePrefixHandleFocus,
-		} = createAdapter();
+		const { adapter, installPinnedItems, select } = createAdapter();
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
-			getSettings: () => prefixSettings,
+			getSettings: () => pinnedSettings,
 			saveSettings,
 			showNotice: vi.fn(),
 		});
 
 		controller.start();
 		triggerLayoutReady();
-		const options = vi.mocked(installPrefixHandles).mock.calls[0]?.[0];
+		const options = vi.mocked(installPinnedItems).mock.calls[0]?.[0];
 		expect(
 			await options?.onReorder({
 				position: 'before',
@@ -273,19 +268,21 @@ describe('ExplorerController', () => {
 				targetPath: 'Projects/First.md',
 			}),
 		).toBe(true);
-		expect(prefixSettings.folders.Projects.orderedPrefix).toEqual([
+		expect(pinnedSettings.folders.Projects.orderedPrefix).toEqual([
 			'Third.md',
 			'First.md',
 			'Second.md',
 		]);
 		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(select).toHaveBeenCalledWith('Projects/Third.md');
 
-		controller.restorePrefixHandleFocus('Projects/Third.md', leaf);
-		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
-			'Projects/Third.md',
-		);
-		controller.restorePrefixHandleFocus('Projects/Third.md');
-		expect(restorePrefixHandleFocus).toHaveBeenCalledOnce();
+		expect(await options?.onUnpin('Projects/First.md')).toBe(true);
+		expect(pinnedSettings.folders.Projects.orderedPrefix).toEqual([
+			'Third.md',
+			'Second.md',
+		]);
+		expect(saveSettings).toHaveBeenCalledTimes(2);
+		expect(select).toHaveBeenCalledWith('Projects/First.md');
 		expect(
 			await options?.onReorder({
 				position: 'after',
@@ -293,7 +290,7 @@ describe('ExplorerController', () => {
 				targetPath: 'Archive/Other.md',
 			}),
 		).toBe(false);
-		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(saveSettings).toHaveBeenCalledTimes(2);
 	});
 
 	it('attaches added leaves and disposes removed leaves', () => {
@@ -800,6 +797,121 @@ describe('ExplorerController', () => {
 
 		expect(collapse).toHaveBeenCalledOnce();
 		expect(collapse).toHaveBeenCalledWith('Archive');
+	});
+
+	it('moves one selected pinned item through commands', async () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const pinnedSettings = {
+			...settings,
+			folders: {
+				Projects: {
+					orderedPrefix: ['First.md', 'Second.md', 'Third.md'],
+				},
+			},
+		};
+		const saveSettings = vi.fn(async () => undefined);
+		const showNotice = vi.fn();
+		const { adapter, select } = createAdapter({
+			getItems: vi.fn(() => [
+				{
+					collapsed: null,
+					folder: false,
+					path: 'Projects/Second.md',
+					selected: true,
+				},
+			]),
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => pinnedSettings,
+			saveSettings,
+			showNotice,
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		await controller.moveSelectedPinnedItem(-1);
+
+		expect(pinnedSettings.folders.Projects.orderedPrefix).toEqual([
+			'Second.md',
+			'First.md',
+			'Third.md',
+		]);
+		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(select).toHaveBeenCalledWith('Projects/Second.md');
+		expect(showNotice).not.toHaveBeenCalled();
+	});
+
+	it('explains why a pinned item command cannot run', async () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const pinnedSettings = {
+			...settings,
+			folders: {
+				Projects: { orderedPrefix: ['First.md', 'Second.md'] },
+			},
+		};
+		const showNotice = vi.fn();
+		const getItems = vi.fn(() => [
+			{
+				collapsed: null,
+				folder: false,
+				path: 'Projects/Other.md',
+				selected: true,
+			},
+		]);
+		const { adapter } = createAdapter({ getItems });
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => pinnedSettings,
+			showNotice,
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		await controller.moveSelectedPinnedItem(-1);
+		expect(showNotice).toHaveBeenLastCalledWith(
+			'File Explorer Tools: select one pinned item in the file explorer.',
+		);
+
+		getItems.mockReturnValue([
+			{
+				collapsed: null,
+				folder: false,
+				path: 'Projects/First.md',
+				selected: true,
+			},
+			{
+				collapsed: null,
+				folder: false,
+				path: 'Projects/Second.md',
+				selected: true,
+			},
+		]);
+		await controller.moveSelectedPinnedItem(-1);
+		expect(showNotice).toHaveBeenLastCalledWith(
+			'File Explorer Tools: select one pinned item in the file explorer.',
+		);
+
+		getItems.mockReturnValue([
+			{
+				collapsed: null,
+				folder: false,
+				path: 'Projects/First.md',
+				selected: true,
+			},
+		]);
+		await controller.moveSelectedPinnedItem(-1);
+		expect(showNotice).toHaveBeenLastCalledWith(
+			'File Explorer Tools: pinned item cannot move further.',
+		);
+
+		controller.toggleForceGlobal();
+		await controller.moveSelectedPinnedItem(1);
+		expect(showNotice).toHaveBeenLastCalledWith(
+			'File Explorer Tools: disable force global sorting to move pinned items.',
+		);
 	});
 
 	it('reapplies sorting when settings change', () => {

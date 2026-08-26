@@ -10,51 +10,32 @@ If your plugin does not need CSS, delete this file.
 	display: none;
 }
 
-.file-explorer-tools-prefix-handle {
-	align-items: center;
-	align-self: stretch;
-	appearance: none;
-	background: transparent;
-	border: 0;
-	color: var(--text-muted);
-	cursor: grab;
-	display: inline-flex;
-	flex: 0 0 var(--clickable-icon-size, 30px);
-	justify-content: center;
-	margin: 0;
-	min-height: var(--clickable-icon-size, 30px);
-	padding: 0;
-	touch-action: none;
+.file-explorer-tools-pin-indicator {
+	background-color: var(--text-muted);
+	flex: 0 0 auto;
+	height: 1em;
+	margin-left: auto;
+	margin-right: 0.25em;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M5 17h14'/%3E%3Cpath d='M6 17v-5l2-2V5h8v5l2 2v5'/%3E%3C/svg%3E") center / contain no-repeat;
+	opacity: 0.55;
+	pointer-events: none;
+	width: 1em;
 }
 
-.file-explorer-tools-prefix-handle::before {
-	background-color: currentColor;
-	content: '';
-	height: var(--icon-size, 18px);
-	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='6' r='1'/%3E%3Ccircle cx='9' cy='12' r='1'/%3E%3Ccircle cx='9' cy='18' r='1'/%3E%3Ccircle cx='15' cy='6' r='1'/%3E%3Ccircle cx='15' cy='12' r='1'/%3E%3Ccircle cx='15' cy='18' r='1'/%3E%3C/svg%3E") center / contain no-repeat;
-	width: var(--icon-size, 18px);
+.file-explorer-tools-pinned-will-unpin .file-explorer-tools-pin-indicator {
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M5 17h14'/%3E%3Cpath d='M6 17v-5l2-2V5h8v5l2 2v5'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-.file-explorer-tools-prefix-handle:hover,
-.file-explorer-tools-prefix-handle:focus-visible {
-	color: var(--text-normal);
-}
-
-.file-explorer-tools-prefix-handle:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-}
-
-.file-explorer-tools-prefix-handle.file-explorer-tools-prefix-dragging {
-	cursor: grabbing;
-}
-
-.file-explorer-tools-prefix-drop-before {
+.file-explorer-tools-pin-drop-before {
 	box-shadow: inset 0 2px 0 var(--interactive-accent);
 }
 
-.file-explorer-tools-prefix-drop-after {
+.file-explorer-tools-pin-drop-after {
 	box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+.file-explorer-tools-pin-drop-unpin {
+	box-shadow: inset 0 0 0 1px var(--text-muted);
 }
 
 .file-explorer-tools-hidden-revealed.nav-file-title,

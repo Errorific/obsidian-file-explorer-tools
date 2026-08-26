@@ -7,7 +7,7 @@ File Explorer Tools extends Obsidian's built-in file explorer with:
 - Per-item hiding and a temporary reveal control
 - Mixed file and folder sorting
 - Per-folder sort overrides
-- Ordered prefixes with normally sorted remainders
+- Pinned items with normally sorted remainders
 - A temporary global-sort override
 - On-demand location of the active file
 - Collapsing folders outside the active file's path
@@ -73,7 +73,7 @@ A file explorer toolbar toggle reveals all hidden items. Revealed items:
 
 Reveal-hidden state resets when Obsidian restarts and is independent for each file explorer leaf.
 
-Hiding an ordered-prefix item retains its stored position. A hidden folder and its descendants retain independent hidden states.
+Hiding a pinned item retains its stored position. A hidden folder and its descendants retain independent hidden states.
 
 Locating or opening a hidden file temporarily reveals only the target and hidden ancestors needed to reach it. Temporary visibility ends when the workspace active file changes or the plugin unloads. Moving focus to another pane, or changing reveal-hidden mode, does not conceal the active file's path.
 
@@ -93,9 +93,9 @@ Files and folders can be globally configured as either mixed or folders first. I
 
 A folder context menu can select a per-folder sort override or return the folder to **Use global**. Overrides are available for every folder, including the vault root.
 
-### Ordered prefixes
+### Pinned items
 
-Each folder can define an ordered prefix. Items not in the prefix continue to use the folder's effective normal sort.
+Each folder can define an ordered set of pinned children. Unpinned items continue to use the folder's effective normal sort.
 
 For example:
 
@@ -110,17 +110,19 @@ Daily
 Templates
 ```
 
-Only prefix items have stored positions.
+Only pinned items have stored positions. A postfix pin marks their state without changing the explorer row height.
 
-Prefix membership is managed through item context menus. Prefix items are rearranged using a dedicated drag handle. Dragging elsewhere retains Obsidian's native move behavior. The handle must also be suitable as a touch target for later mobile support.
+Pin membership is managed through direct **Pin** and **Unpin** item context-menu actions. Dragging a pinned row over the top or bottom of a pinned sibling places it before or after that sibling. Dropping it on an unpinned sibling in the same parent unpins it. The center third of a folder row, cross-folder targets, and blank explorer space retain Obsidian's native move behavior.
 
-Prefix entries survive temporary hiding and temporary global sorting.
+Commands move the selected pinned item up or down as keyboard and command-palette alternatives. A command requires exactly one pinned explorer item to be selected and reports why it cannot run otherwise.
+
+Pinned entries survive temporary hiding and temporary global sorting.
 
 ### Force-global sorting
 
 A file explorer toolbar toggle temporarily ignores:
 
-- Ordered prefixes
+- Pinned-item ordering
 - Per-folder sort overrides
 
 It does not delete stored configuration. It resets when Obsidian restarts and is shared across all file explorer leaves.
@@ -179,8 +181,8 @@ Commands remain available separately, including an explicit collapse command.
 
 ### Accessibility
 
-- Reorder handles must be keyboard-focusable and expose accessible labels identifying their items.
-- Context menus must provide move-up and move-down actions as non-drag alternatives for ordered-prefix items.
+- Move-pinned-item commands must remain available in the command palette and support user-assigned hotkeys.
+- Move commands must report when there is no unique selected pinned item or when the item cannot move farther.
 - Toolbar toggles must expose pressed state and meaningful tooltips.
 - Hidden state must not be conveyed through opacity alone.
 - Reordering and locating items must preserve useful keyboard focus.
@@ -211,7 +213,7 @@ src/
     comparator.test.ts
     order.ts
     order.test.ts
-    prefix-controller.ts
+    pinned-items.ts
 
   navigation/
     locate-current-file.ts
@@ -267,15 +269,15 @@ The sorting engine is a pure, testable comparator.
 
 When force-global sorting is disabled, comparison proceeds as follows:
 
-1. Compare ordered-prefix positions.
-2. Place items with prefix positions before ordinary items.
+1. Compare pinned-item positions.
+2. Place pinned items before ordinary items.
 3. Apply the effective normal sort mode:
    - The folder override, if configured
    - Otherwise the global core sort mode
 4. Apply global type grouping.
 5. Use path or name as a deterministic final tie-breaker.
 
-When force-global sorting is enabled, ordered-prefix positions and folder overrides are skipped.
+When force-global sorting is enabled, pinned-item positions and folder overrides are skipped.
 
 The explorer's original sorted list may provide core-compatible metadata ordering, but the plugin must not implement sorting by merely rearranging rendered DOM nodes. The comparator must act on underlying explorer child items.
 
@@ -324,7 +326,7 @@ interface FolderConfiguration {
 
 `orderedPrefix` stores child names under the parent folder rather than absolute paths. Vault siblings cannot share a name, and parent-folder renames therefore do not require rewriting prefix entries.
 
-Obsidian's core explorer remains the source of truth for the global sort mode. The plugin persists only its folder-grouping preference, hidden paths, ordered prefixes, and per-folder overrides.
+Obsidian's core explorer remains the source of truth for the global sort mode. The plugin persists only its folder-grouping preference, hidden paths, pinned items, and per-folder overrides.
 
 Settings are validated and normalized after `loadData()`:
 
@@ -403,7 +405,7 @@ Status: Implemented and manually verified against Obsidian 1.13.7.
 - Implement and comprehensively test pure comparators
 - Add mixed and folders-first behavior
 - Add per-folder overrides
-- Implement ordered-prefix persistence
+- Implement pinned-item persistence
 - Implement force-global session mode
 - Wire core sort menu state into the plugin's global mode
 
@@ -441,17 +443,19 @@ The guarded integration reads the enabled `folder-notes` plugin's `folderNoteNam
 - Implement associated-subtree preservation
 - Test enabled, disabled, and incompatible-plugin cases
 
-### Phase 7: Ordered-prefix interaction
+### Phase 7: Pinned-item interaction
 
-Status: Implementation and automated verification complete. Manual Obsidian verification is pending.
+Status: Redesigned implementation and automated verification complete. Manual Obsidian verification is pending.
 
-Ordered-prefix actions appear in an **Ordered prefix** context submenu, with a flat fallback for Obsidian versions that do not support submenus. Prefix items receive persistent, keyboard-focusable reorder handles that use pointer events for mouse, pen, and touch input. Drops over the upper or lower half of another prefix item insert before or after it. Handles accept only same-parent prefix targets, restore focus after a successful reorder, and remain hidden while force-global sorting is active.
+Pinned items use a compact postfix status marker and direct **Pin** or **Unpin** context-menu actions. Desktop reordering uses the explorer row's native drag source. Capture-phase handlers intercept only same-parent reorder and unpin zones, while folder-center, cross-folder, and blank-space drops continue to Obsidian's native move handlers. Force-global sorting keeps pin markers visible but disables custom drops and move commands.
 
-- Add context-menu prefix controls
-- Render dedicated drag handles
-- Reorder only within a single parent
-- Preserve native drag-to-move behavior
-- Keep the interaction touch-compatible for the later mobile milestone
+- Add direct Pin and Unpin context-menu controls
+- Render postfix pin status markers without changing row dimensions
+- Reorder pinned siblings through top and bottom drop zones
+- Unpin through same-parent ordinary-item drops
+- Preserve native drag-to-move behavior for folder and cross-parent targets
+- Add move-up and move-down commands for keyboard access
+- Add touch dragging during the mobile milestone without changing persisted data
 
 ### Phase 8: Desktop hardening
 
@@ -469,7 +473,7 @@ Pure functionality should be tested without an Obsidian runtime wherever possibl
 
 - Every comparator mode and direction
 - Mixed and folders-first behavior
-- Ordered-prefix precedence
+- Pinned-item precedence
 - Deterministic tie-breaking
 - Force-global behavior
 - Settings migration on file and folder rename
@@ -500,6 +504,7 @@ Every implementation phase must meet these criteria before it is considered comp
 
 ## Research notes
 
+- Flexplorer 4.0.5 uses native desktop drag events, capture-phase drop handling, pointer proximity for sibling insertion, a center folder drop zone, and a postfix pin indicator. It prevents every drop and performs moves through `fileManager.renameFile()`. File Explorer Tools adopts the narrow event and drop-zone observations but intercepts only same-parent pin operations so Obsidian remains responsible for native folder and vault-root moves.
 - Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
 - Follow-up research found no supported user-interface action for opening a second built-in file explorer. Obsidian core requests `getLeavesOfType("file-explorer")` and uses the first result, creating a left-sidebar leaf with `setViewState({ type: "file-explorer" })` only when none exists. A plugin can attempt to assign the view type to another leaf, but coexistence and workspace persistence for multiple built-in explorers are undocumented and unverified.
 - Folder Notes stores notes using `storageLocation: 'insideFolder'` or `storageLocation: 'parentFolder'` and derives names from `folderNoteName`, commonly `{{folder_name}}`. Its source retains a `vaultFolder` settings value that is absent from the current settings UI and cannot unambiguously associate nested folders, so the integration fails open for that value.
@@ -557,15 +562,15 @@ Mitigations:
 
 ### Mobile toolbar and dragging
 
-Toolbar layout and drag behavior differ on mobile.
+Toolbar layout and drag behavior differ on mobile. Desktop HTML drag events do not provide the required touch interaction.
 
 Mitigations:
 
 - Expose all actions as commands
-- Use a dedicated reorder handle
+- Keep pin state and ordering independent of the input implementation
 - Avoid modifier-key interactions
 - Avoid hover-dependent controls
-- Test explicitly on iOS and Android during the mobile milestone
+- Add and test an explicit touch gesture on iOS and Android during the mobile milestone
 
 ## Delivery scope
 
@@ -574,7 +579,7 @@ The first daily-use milestone includes all desktop features described in this do
 - Hiding and temporary reveal
 - Mixed sorting
 - Global and per-folder sort modes
-- Ordered prefixes
+- Pinned items
 - Force-global sorting
 - Locate and collapse behavior
 - Commands and toolbar controls

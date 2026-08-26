@@ -1,6 +1,6 @@
 import type { FileExplorerToolsSettings } from '../settings';
 
-export function addPrefixItem(
+export function pinItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,
@@ -12,7 +12,7 @@ export function addPrefixItem(
 	}
 }
 
-export function reorderPrefixItem(
+export function reorderPinnedItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,
@@ -43,7 +43,7 @@ export function reorderPrefixItem(
 	return true;
 }
 
-export function removePrefixItem(
+export function unpinItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,
@@ -61,7 +61,7 @@ export function removePrefixItem(
 	}
 }
 
-export function movePrefixItem(
+export function movePinnedItem(
 	settings: FileExplorerToolsSettings,
 	folderPath: string,
 	itemName: string,

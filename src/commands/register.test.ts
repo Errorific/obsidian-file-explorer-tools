@@ -16,11 +16,13 @@ describe('registerCommands', () => {
 		)} as unknown as Plugin;
 		const collapseToCurrentPath = vi.fn();
 		const locateCurrentFile = vi.fn();
+		const moveSelectedPinnedItem = vi.fn();
 		const toggleForceGlobal = vi.fn();
 		const toggleHiddenItems = vi.fn();
 		const controller = {
 			collapseToCurrentPath,
 			locateCurrentFile,
+			moveSelectedPinnedItem,
 			toggleForceGlobal,
 			toggleHiddenItems,
 		} as unknown as ExplorerController;
@@ -35,10 +37,14 @@ describe('registerCommands', () => {
 			'locate-current-file',
 			'collapse-to-current-path',
 			'toggle-force-global-sorting',
+			'move-pinned-item-up',
+			'move-pinned-item-down',
 		]);
 		expect(toggleHiddenItems).toHaveBeenCalledOnce();
 		expect(locateCurrentFile).toHaveBeenCalledOnce();
 		expect(collapseToCurrentPath).toHaveBeenCalledOnce();
 		expect(toggleForceGlobal).toHaveBeenCalledOnce();
+		expect(moveSelectedPinnedItem).toHaveBeenNthCalledWith(1, -1);
+		expect(moveSelectedPinnedItem).toHaveBeenNthCalledWith(2, 1);
 	});
 });

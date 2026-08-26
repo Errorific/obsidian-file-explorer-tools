@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../settings';
 import {
-	addPrefixItem,
-	movePrefixItem,
-	removePrefixItem,
-	reorderPrefixItem,
-} from './prefix-controller';
+	movePinnedItem,
+	pinItem,
+	reorderPinnedItem,
+	unpinItem,
+} from './pinned-items';
 
-describe('ordered-prefix settings', () => {
-	it('adds an item without duplicating existing entries', () => {
+describe('pinned item settings', () => {
+	it('pins an item without duplicating existing entries', () => {
 		const settings = loadSettings(undefined);
 
-		addPrefixItem(settings, 'Projects', 'Current.md');
-		addPrefixItem(settings, 'Projects', 'Current.md');
+		pinItem(settings, 'Projects', 'Current.md');
+		pinItem(settings, 'Projects', 'Current.md');
 
 		expect(settings.folders.Projects).toEqual({
 			orderedPrefix: ['Current.md'],
@@ -28,13 +28,13 @@ describe('ordered-prefix settings', () => {
 			},
 		});
 
-		expect(movePrefixItem(settings, 'Projects', 'Third.md', -1)).toBe(true);
+		expect(movePinnedItem(settings, 'Projects', 'Third.md', -1)).toBe(true);
 		expect(settings.folders.Projects?.orderedPrefix).toEqual([
 			'First.md',
 			'Third.md',
 			'Second.md',
 		]);
-		expect(movePrefixItem(settings, 'Projects', 'First.md', -1)).toBe(false);
+		expect(movePinnedItem(settings, 'Projects', 'First.md', -1)).toBe(false);
 	});
 
 	it('reorders an item before or after another prefix item', () => {
@@ -47,7 +47,7 @@ describe('ordered-prefix settings', () => {
 		});
 
 		expect(
-			reorderPrefixItem(
+			reorderPinnedItem(
 				settings,
 				'Projects',
 				'Third.md',
@@ -61,7 +61,7 @@ describe('ordered-prefix settings', () => {
 			'Second.md',
 		]);
 		expect(
-			reorderPrefixItem(
+			reorderPinnedItem(
 				settings,
 				'Projects',
 				'Third.md',
@@ -86,7 +86,7 @@ describe('ordered-prefix settings', () => {
 		});
 
 		expect(
-			reorderPrefixItem(
+			reorderPinnedItem(
 				settings,
 				'Projects',
 				'First.md',
@@ -95,7 +95,7 @@ describe('ordered-prefix settings', () => {
 			),
 		).toBe(false);
 		expect(
-			reorderPrefixItem(
+			reorderPinnedItem(
 				settings,
 				'Projects',
 				'First.md',
@@ -104,7 +104,7 @@ describe('ordered-prefix settings', () => {
 			),
 		).toBe(false);
 		expect(
-			reorderPrefixItem(
+			reorderPinnedItem(
 				settings,
 				'Missing',
 				'First.md',
@@ -133,8 +133,8 @@ describe('ordered-prefix settings', () => {
 			},
 		});
 
-		removePrefixItem(prefixOnly, 'Projects', 'Current.md');
-		removePrefixItem(withOverride, 'Projects', 'Current.md');
+		unpinItem(prefixOnly, 'Projects', 'Current.md');
+		unpinItem(withOverride, 'Projects', 'Current.md');
 
 		expect(prefixOnly.folders).toEqual({});
 		expect(withOverride.folders.Projects).toEqual({

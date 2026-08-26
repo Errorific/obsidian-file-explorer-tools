@@ -1,4 +1,4 @@
-import { Notice, Plugin, type WorkspaceLeaf } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands/register';
 import { ExplorerController } from './explorer/controller';
 import {
@@ -10,7 +10,7 @@ import { applyDelete, applyRename } from './settings-events';
 import { registerHiddenItemMenu } from './hiding/menu';
 import { createFolderNoteIntegration } from './integrations/folder-notes';
 import { registerFolderSortMenu } from './sorting/folder-menu';
-import { registerPrefixMenu } from './sorting/prefix-menu';
+import { registerPinMenu } from './sorting/pin-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
 export default class FileExplorerToolsPlugin extends Plugin {
@@ -42,7 +42,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		});
 		registerCommands(this, () => this.explorerController);
 		registerFolderSortMenu(this);
-		registerPrefixMenu(this);
+		registerPinMenu(this);
 		registerHiddenItemMenu(this);
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) {
@@ -80,10 +80,6 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.unloaded = true;
 		this.explorerController?.dispose();
 		this.explorerController = null;
-	}
-
-	restorePrefixHandleFocus(path: string, leaf?: WorkspaceLeaf): void {
-		this.explorerController?.restorePrefixHandleFocus(path, leaf);
 	}
 
 	async saveSettings(): Promise<void> {

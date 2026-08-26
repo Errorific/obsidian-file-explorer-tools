@@ -6,8 +6,8 @@ import {
 	type ExplorerCompatibilityReport,
 	type ExplorerItemSnapshot,
 	type ItemVisibility,
-	type PrefixHandleOptions,
-	type PrefixReorderRequest,
+	type PinnedItemOptions,
+	type PinnedReorderRequest,
 	type SortingOptionsProvider,
 	type ToolbarAction,
 } from './adapter-types';
@@ -77,7 +77,7 @@ const CAPABILITY_LABELS = {
 	select: 'select items',
 	scroll: 'scroll to items',
 	toolbar: 'add toolbar actions',
-	prefixHandles: 'add ordered-prefix handles',
+	pinnedItems: 'add pinned item interactions',
 } as const;
 
 export function createExplorerAdapter(
@@ -92,7 +92,7 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 	private readonly originalSort: UnknownFunction | null;
 	private readonly failedCapabilities = new Set<string>();
 	private readonly toolbarUpdates = new Set<() => void>();
-	private prefixHandles: PrefixHandleController | null = null;
+	private pinnedItems: PinnedItemController | null = null;
 
 	constructor(
 		private readonly view: InternalExplorerView,
@@ -203,7 +203,7 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		);
 		this.addUnavailable(
 			unavailableCapabilities,
-			CAPABILITY_LABELS.prefixHandles,
+			CAPABILITY_LABELS.pinnedItems,
 			false,
 		);
 
@@ -265,31 +265,38 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		return isCoreSortMode(this.view.sortOrder) ? this.view.sortOrder : null;
 	}
 
-	installPrefixHandles(options: PrefixHandleOptions): (() => void) | null {
-		const document = readOwnerDocument(this.view.navFileContainerEl);
-		if (document === null) {
-			this.failedCapabilities.add(CAPABILITY_LABELS.prefixHandles);
+	installPinnedItems(options: PinnedItemOptions): (() => void) | null {
+		const container = readDomElement(this.view.navFileContainerEl);
+		const document = readOwnerDocument(container);
+		if (container === null || document === null) {
+			this.failedCapabilities.add(CAPABILITY_LABELS.pinnedItems);
 			return null;
 		}
 
-		this.prefixHandles?.dispose();
-		const controller = new PrefixHandleController(
+		this.pinnedItems?.dispose();
+		const controller = new PinnedItemController(
+			container,
 			document,
 			() => this.readItems() ?? [],
 			options,
 		);
-		this.prefixHandles = controller;
+		this.pinnedItems = controller;
 		try {
+			controller.attach();
 			controller.refresh();
 		} catch {
-			controller.dispose();
-			this.prefixHandles = null;
-			this.failedCapabilities.add(CAPABILITY_LABELS.prefixHandles);
+			try {
+				controller.dispose();
+			} catch {
+				// Compatibility cleanup is best-effort after partial attachment.
+			}
+			this.pinnedItems = null;
+			this.failedCapabilities.add(CAPABILITY_LABELS.pinnedItems);
 			return null;
 		}
 		return () => {
-			if (this.prefixHandles === controller) {
-				this.prefixHandles = null;
+			if (this.pinnedItems === controller) {
+				this.pinnedItems = null;
 			}
 			controller.dispose();
 		};
@@ -356,17 +363,21 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}
 	}
 
-	refreshPrefixHandles(): void {
-		const controller = this.prefixHandles;
+	refreshPinnedItems(): void {
+		const controller = this.pinnedItems;
 		if (controller === null) {
 			return;
 		}
 		try {
 			controller.refresh();
 		} catch {
-			controller.dispose();
-			this.prefixHandles = null;
-			this.failedCapabilities.add(CAPABILITY_LABELS.prefixHandles);
+			try {
+				controller.dispose();
+			} catch {
+				// Compatibility cleanup is best-effort after a failed refresh.
+			}
+			this.pinnedItems = null;
+			this.failedCapabilities.add(CAPABILITY_LABELS.pinnedItems);
 		}
 	}
 
@@ -374,10 +385,6 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		for (const update of this.toolbarUpdates) {
 			update();
 		}
-	}
-
-	restorePrefixHandleFocus(path: string): void {
-		this.prefixHandles?.restoreFocus(path);
 	}
 
 	runOriginalSort(): boolean {
@@ -534,42 +541,59 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 	}
 }
 
-interface PrefixHandleEntry {
+interface PinnedIndicatorEntry {
 	dispose(): void;
-	handle: HTMLElement;
+	indicator: HTMLElement;
 	row: HTMLElement;
 }
 
-interface PrefixPointerDrag {
-	dragging: boolean;
-	pointerId: number;
-	sourcePath: string;
-	startX: number;
-	startY: number;
-	target: PrefixReorderRequest | null;
+interface RenderedPinnedItem {
+	folder: boolean;
+	path: string;
+	row: HTMLElement;
 }
 
-class PrefixHandleController {
-	private readonly entries = new Map<string, PrefixHandleEntry>();
-	private activeDrag: PrefixPointerDrag | null = null;
+type PinnedDropAction =
+	| { request: PinnedReorderRequest; type: 'reorder' }
+	| { sourcePath: string; targetPath: string; type: 'unpin' };
+
+class PinnedItemController {
+	private readonly indicators = new Map<string, PinnedIndicatorEntry>();
+	private readonly renderedItems = new Map<string, RenderedPinnedItem>();
+	private itemsByRow = new WeakMap<HTMLElement, RenderedPinnedItem>();
+	private draggingPath: string | null = null;
 	private disposed = false;
 
 	constructor(
+		private readonly container: HTMLElement,
 		private readonly document: Document,
 		private readonly readItems: () => Array<{
 			path: string;
 			value: InternalExplorerItem;
 		}>,
-		private readonly options: PrefixHandleOptions,
+		private readonly options: PinnedItemOptions,
 	) {}
+
+	attach(): void {
+		this.container.addEventListener('dragstart', this.onDragStart, true);
+		this.container.addEventListener('dragover', this.onDragOver, true);
+		this.container.addEventListener('drop', this.onDrop, true);
+		this.container.addEventListener('dragend', this.onDragEnd, true);
+	}
 
 	dispose(): void {
 		this.disposed = true;
+		this.container.removeEventListener('dragstart', this.onDragStart, true);
+		this.container.removeEventListener('dragover', this.onDragOver, true);
+		this.container.removeEventListener('drop', this.onDrop, true);
+		this.container.removeEventListener('dragend', this.onDragEnd, true);
 		this.clearDrag();
-		for (const entry of this.entries.values()) {
+		for (const entry of this.indicators.values()) {
 			entry.dispose();
 		}
-		this.entries.clear();
+		this.indicators.clear();
+		this.renderedItems.clear();
+		this.itemsByRow = new WeakMap();
 	}
 
 	refresh(): void {
@@ -577,266 +601,210 @@ class PrefixHandleController {
 			return;
 		}
 
+		this.renderedItems.clear();
+		this.itemsByRow = new WeakMap();
 		const retainedPaths = new Set<string>();
 		for (const item of this.readItems()) {
-			if (!this.options.isOrdered(item.path)) {
-				continue;
-			}
 			const row = readItemTitleRow(item.value);
 			if (row === null) {
 				continue;
 			}
+			const rendered = {
+				folder: typeof item.value.setCollapsed === 'function',
+				path: item.path,
+				row,
+			};
+			this.renderedItems.set(item.path, rendered);
+			this.itemsByRow.set(row, rendered);
+			if (!this.options.isPinned(item.path)) {
+				continue;
+			}
 
 			retainedPaths.add(item.path);
-			const existing = this.entries.get(item.path);
+			const existing = this.indicators.get(item.path);
 			if (
 				existing !== undefined &&
 				existing.row === row &&
-				row.contains(existing.handle)
+				row.contains(existing.indicator)
 			) {
 				continue;
 			}
 			existing?.dispose();
-			this.entries.set(item.path, this.addHandle(item.path, row));
+			this.indicators.set(item.path, this.addIndicator(row));
 		}
 
-		for (const [path, entry] of this.entries) {
+		for (const [path, entry] of this.indicators) {
 			if (!retainedPaths.has(path)) {
 				entry.dispose();
-				this.entries.delete(path);
+				this.indicators.delete(path);
 			}
 		}
 	}
 
-	restoreFocus(path: string): void {
-		const focus = () => {
-			if (this.disposed) {
-				return;
-			}
-			try {
-				this.refresh();
-				this.entries.get(path)?.handle.focus({ preventScroll: true });
-			} catch {
-				try {
-					this.entries.get(path)?.handle.focus();
-				} catch {
-					return;
-				}
-			}
-		};
-		const window = this.document.defaultView;
-		if (typeof window?.requestAnimationFrame === 'function') {
-			window.requestAnimationFrame(focus);
-		} else {
-			focus();
+	private readonly onDragStart = (event: DragEvent): void => {
+		this.clearDrag();
+		if (!this.options.isInteractionEnabled()) {
+			return;
 		}
-	}
+		const item = this.findEventItem(event.target);
+		if (item === null || !this.options.isPinned(item.path)) {
+			return;
+		}
+		this.draggingPath = item.path;
+		item.row.classList.add('file-explorer-tools-pinned-dragging');
+	};
 
-	private addHandle(path: string, row: HTMLElement): PrefixHandleEntry {
-		const handle = this.document.createElement('button');
-		handle.type = 'button';
-		handle.tabIndex = 0;
-		handle.draggable = false;
-		handle.classList.add('file-explorer-tools-prefix-handle');
-		handle.setAttribute('aria-label', `Reorder ${nameOf(path)}`);
-		handle.setAttribute('aria-roledescription', 'drag handle');
-		handle.setAttribute('title', `Reorder ${nameOf(path)}`);
+	private readonly onDragOver = (event: DragEvent): void => {
+		const action = this.getDropAction(event);
+		this.updateDropClasses(action);
+		if (action === null) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		if (event.dataTransfer !== null) {
+			event.dataTransfer.dropEffect = 'move';
+		}
+	};
 
-		const onPointerDown = (event: PointerEvent) =>
-			this.startDrag(path, handle, event);
-		const onPointerMove = (event: PointerEvent) =>
-			this.updateDrag(path, event);
-		const onPointerUp = (event: PointerEvent) =>
-			this.finishDrag(path, handle, event);
-		const onPointerCancel = (event: PointerEvent) =>
-			this.cancelDrag(path, handle, event);
-		const stopClick = (event: MouseEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-		};
-		const stopNativeDrag = (event: DragEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-		};
-		handle.addEventListener('pointerdown', onPointerDown);
-		handle.addEventListener('pointermove', onPointerMove);
-		handle.addEventListener('pointerup', onPointerUp);
-		handle.addEventListener('pointercancel', onPointerCancel);
-		handle.addEventListener('click', stopClick);
-		handle.addEventListener('dragstart', stopNativeDrag);
+	private readonly onDrop = (event: DragEvent): void => {
+		const action = this.getDropAction(event);
+		this.clearDrag();
+		if (action === null) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		void this.applyDropAction(action);
+	};
 
-		const content = readTitleContent(row);
-		row.insertBefore(handle, content);
+	private readonly onDragEnd = (): void => {
+		this.clearDrag();
+	};
+
+	private addIndicator(row: HTMLElement): PinnedIndicatorEntry {
+		const indicator = this.document.createElement('span');
+		indicator.classList.add('file-explorer-tools-pin-indicator');
+		indicator.draggable = false;
+		indicator.setAttribute('aria-hidden', 'true');
+		indicator.setAttribute('title', 'Pinned');
+		row.setAttribute('data-file-explorer-tools-pinned', 'true');
+		row.insertBefore(indicator, null);
 		return {
-			handle,
+			indicator,
 			row,
 			dispose: () => {
-				handle.removeEventListener('pointerdown', onPointerDown);
-				handle.removeEventListener('pointermove', onPointerMove);
-				handle.removeEventListener('pointerup', onPointerUp);
-				handle.removeEventListener('pointercancel', onPointerCancel);
-				handle.removeEventListener('click', stopClick);
-				handle.removeEventListener('dragstart', stopNativeDrag);
-				handle.remove();
-				clearDropClasses(row);
+				indicator.remove();
+				row.removeAttribute('data-file-explorer-tools-pinned');
+				clearPinnedDropClasses(row);
 			},
 		};
 	}
 
-	private startDrag(
-		path: string,
-		handle: HTMLElement,
-		event: PointerEvent,
-	): void {
-		if (event.button !== 0 || event.isPrimary === false) {
-			return;
+	private getDropAction(event: DragEvent): PinnedDropAction | null {
+		const sourcePath = this.draggingPath;
+		if (
+			sourcePath === null ||
+			!this.options.isInteractionEnabled() ||
+			!this.options.isPinned(sourcePath)
+		) {
+			return null;
 		}
-		this.clearDrag();
-		event.preventDefault();
-		event.stopPropagation();
-		try {
-			handle.setPointerCapture(event.pointerId);
-		} catch {
-			// Pointer capture can be unavailable for detached explorer rows.
+
+		const target = this.findEventItem(event.target);
+		if (
+			target === null ||
+			target.path === sourcePath ||
+			parentOf(target.path) !== parentOf(sourcePath)
+		) {
+			return null;
 		}
-		this.activeDrag = {
-			dragging: false,
-			pointerId: event.pointerId,
-			sourcePath: path,
-			startX: event.clientX,
-			startY: event.clientY,
-			target: null,
+		const bounds = readBounds(target.row);
+		if (
+			bounds === null ||
+			bounds.height <= 0 ||
+			event.clientY < bounds.top ||
+			event.clientY > bounds.bottom
+		) {
+			return null;
+		}
+
+		const relativeY = event.clientY - bounds.top;
+		if (
+			target.folder &&
+			relativeY >= bounds.height / 3 &&
+			relativeY <= (bounds.height * 2) / 3
+		) {
+			return null;
+		}
+		if (!this.options.isPinned(target.path)) {
+			return { sourcePath, targetPath: target.path, type: 'unpin' };
+		}
+		return {
+			type: 'reorder',
+			request: {
+				sourcePath,
+				targetPath: target.path,
+				position: relativeY < bounds.height / 2 ? 'before' : 'after',
+			},
 		};
 	}
 
-	private updateDrag(path: string, event: PointerEvent): void {
-		const drag = this.activeDrag;
-		if (
-			drag === null ||
-			drag.sourcePath !== path ||
-			drag.pointerId !== event.pointerId
-		) {
-			return;
-		}
-		event.preventDefault();
-		event.stopPropagation();
-		if (
-			!drag.dragging &&
-			Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6
-		) {
-			return;
-		}
-		drag.dragging = true;
-		this.entries
-			.get(path)
-			?.handle.classList.add('file-explorer-tools-prefix-dragging');
-		drag.target = this.findDropTarget(path, event.clientY);
-		this.updateDropClasses(drag.target);
-	}
-
-	private finishDrag(
-		path: string,
-		handle: HTMLElement,
-		event: PointerEvent,
-	): void {
-		const drag = this.activeDrag;
-		if (
-			drag === null ||
-			drag.sourcePath !== path ||
-			drag.pointerId !== event.pointerId
-		) {
-			return;
-		}
-		event.preventDefault();
-		event.stopPropagation();
-		const target = drag.dragging ? drag.target : null;
-		this.releasePointer(handle, event.pointerId);
-		this.clearDrag();
-		if (target !== null) {
-			void this.applyReorder(target);
-		}
-	}
-
-	private cancelDrag(
-		path: string,
-		handle: HTMLElement,
-		event: PointerEvent,
-	): void {
-		if (
-			this.activeDrag?.sourcePath !== path ||
-			this.activeDrag.pointerId !== event.pointerId
-		) {
-			return;
-		}
-		this.releasePointer(handle, event.pointerId);
-		this.clearDrag();
-	}
-
-	private async applyReorder(request: PrefixReorderRequest): Promise<void> {
-		try {
-			if (await this.options.onReorder(request)) {
-				this.restoreFocus(request.sourcePath);
+	private findEventItem(target: EventTarget | null): RenderedPinnedItem | null {
+		let element = readEventElement(target);
+		while (element !== null && this.container.contains(element)) {
+			const item = this.itemsByRow.get(element);
+			if (item !== undefined) {
+				return item;
 			}
-		} catch {
-			// The explorer remains usable when persistence fails during a reorder.
-		}
-	}
-
-	private findDropTarget(
-		sourcePath: string,
-		clientY: number,
-	): PrefixReorderRequest | null {
-		const sourceParent = parentOf(sourcePath);
-		for (const [targetPath, entry] of this.entries) {
-			if (targetPath === sourcePath || parentOf(targetPath) !== sourceParent) {
-				continue;
-			}
-			const bounds = readBounds(entry.row);
-			if (
-				bounds === null ||
-				bounds.height <= 0 ||
-				clientY < bounds.top ||
-				clientY > bounds.bottom
-			) {
-				continue;
-			}
-			return {
-				sourcePath,
-				targetPath,
-				position:
-					clientY < bounds.top + bounds.height / 2 ? 'before' : 'after',
-			};
+			element = readDomElement(element.parentElement);
 		}
 		return null;
 	}
 
-	private updateDropClasses(target: PrefixReorderRequest | null): void {
-		for (const [path, entry] of this.entries) {
-			entry.row.classList.toggle(
-				'file-explorer-tools-prefix-drop-before',
-				target?.targetPath === path && target.position === 'before',
+	private updateDropClasses(action: PinnedDropAction | null): void {
+		for (const item of this.renderedItems.values()) {
+			item.row.classList.toggle(
+				'file-explorer-tools-pinned-will-unpin',
+				action?.type === 'unpin' && action.sourcePath === item.path,
 			);
-			entry.row.classList.toggle(
-				'file-explorer-tools-prefix-drop-after',
-				target?.targetPath === path && target.position === 'after',
+			item.row.classList.toggle(
+				'file-explorer-tools-pin-drop-before',
+				action?.type === 'reorder' &&
+					action.request.targetPath === item.path &&
+					action.request.position === 'before',
 			);
+			item.row.classList.toggle(
+				'file-explorer-tools-pin-drop-after',
+				action?.type === 'reorder' &&
+					action.request.targetPath === item.path &&
+					action.request.position === 'after',
+			);
+			item.row.classList.toggle(
+				'file-explorer-tools-pin-drop-unpin',
+				action?.type === 'unpin' && action.targetPath === item.path,
+			);
+		}
+	}
+
+	private async applyDropAction(action: PinnedDropAction): Promise<void> {
+		try {
+			if (action.type === 'reorder') {
+				await this.options.onReorder(action.request);
+			} else {
+				await this.options.onUnpin(action.sourcePath);
+			}
+		} catch {
+			// The explorer remains usable when persistence fails during a drop.
 		}
 	}
 
 	private clearDrag(): void {
-		for (const entry of this.entries.values()) {
-			entry.handle.classList.remove('file-explorer-tools-prefix-dragging');
-			clearDropClasses(entry.row);
+		for (const item of this.renderedItems.values()) {
+			item.row.classList.remove('file-explorer-tools-pinned-dragging');
+			clearPinnedDropClasses(item.row);
 		}
-		this.activeDrag = null;
-	}
-
-	private releasePointer(handle: HTMLElement, pointerId: number): void {
-		try {
-			handle.releasePointerCapture(pointerId);
-		} catch {
-			// Pointer capture may already be released after cancellation.
-		}
+		this.draggingPath = null;
 	}
 }
 
@@ -901,16 +869,19 @@ function readItemTitleRow(item: InternalExplorerItem): HTMLElement | null {
 	return null;
 }
 
-function readTitleContent(row: HTMLElement): HTMLElement | null {
-	try {
-		return readDomElement(
-			row.querySelector(
-				'.nav-file-title-content, .nav-folder-title-content',
-			),
-		);
-	} catch {
-		return null;
+function readEventElement(value: unknown): HTMLElement | null {
+	let candidate = value;
+	while (candidate !== null) {
+		const element = readDomElement(candidate);
+		if (element !== null) {
+			return element;
+		}
+		if (!isRecord(candidate)) {
+			return null;
+		}
+		candidate = candidate.parentElement ?? candidate.parentNode ?? null;
 	}
+	return null;
 }
 
 function readDomElement(value: unknown): HTMLElement | null {
@@ -958,9 +929,11 @@ function isTitleContent(element: HTMLElement): boolean {
 	);
 }
 
-function clearDropClasses(row: HTMLElement): void {
-	row.classList.remove('file-explorer-tools-prefix-drop-before');
-	row.classList.remove('file-explorer-tools-prefix-drop-after');
+function clearPinnedDropClasses(row: HTMLElement): void {
+	row.classList.remove('file-explorer-tools-pinned-will-unpin');
+	row.classList.remove('file-explorer-tools-pin-drop-before');
+	row.classList.remove('file-explorer-tools-pin-drop-after');
+	row.classList.remove('file-explorer-tools-pin-drop-unpin');
 }
 
 function parentOf(path: string): string {

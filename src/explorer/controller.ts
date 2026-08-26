@@ -9,7 +9,11 @@ import {
 	type ExplorerLeafState,
 } from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
-import { reorderPrefixItem } from '../sorting/prefix-controller';
+import {
+	movePinnedItem,
+	reorderPinnedItem,
+	unpinItem,
+} from '../sorting/pinned-items';
 import {
 	getAncestorFolderPaths,
 	getFoldersToCollapse,
@@ -17,7 +21,7 @@ import {
 import { createExplorerAdapter } from './adapter';
 import type {
 	ExplorerAdapter,
-	PrefixReorderRequest,
+	PinnedReorderRequest,
 } from './adapter-types';
 import { formatCompatibilityReport } from './toolbar';
 
@@ -128,7 +132,7 @@ export class ExplorerController {
 	refreshSorting(): void {
 		for (const attached of this.attachedLeaves.values()) {
 			attached.adapter.runOriginalSort();
-			attached.adapter.refreshPrefixHandles();
+			attached.adapter.refreshPinnedItems();
 			this.applyVisibility(attached);
 		}
 	}
@@ -139,11 +143,51 @@ export class ExplorerController {
 		}
 	}
 
-	restorePrefixHandleFocus(path: string, leaf?: ExplorerLeaf): void {
-		if (leaf === undefined) {
+	async moveSelectedPinnedItem(offset: -1 | 1): Promise<void> {
+		if (this.forceGlobal) {
+			this.showNotice(
+				'File Explorer Tools: disable force global sorting to move pinned items.',
+			);
 			return;
 		}
-		this.attachedLeaves.get(leaf)?.adapter.restorePrefixHandleFocus(path);
+
+		const selected = [...this.attachedLeaves.values()].flatMap((attached) =>
+			attached.adapter
+				.getItems()
+				.filter((item) => item.selected)
+				.map((item) => ({ attached, path: item.path })),
+		);
+		const selectedPaths = [...new Set(selected.map(({ path }) => path))];
+		const path = selectedPaths[0];
+		if (
+			selectedPaths.length !== 1 ||
+			path === undefined ||
+			!this.isPinnedPath(path)
+		) {
+			this.showNotice(
+				'File Explorer Tools: select one pinned item in the file explorer.',
+			);
+			return;
+		}
+
+		if (
+			!movePinnedItem(
+				this.getSettings(),
+				parentOf(path),
+				nameOf(path),
+				offset,
+			)
+		) {
+			this.showNotice('File Explorer Tools: pinned item cannot move further.');
+			return;
+		}
+
+		await this.saveSettings();
+		for (const candidate of selected) {
+			if (candidate.path === path) {
+				candidate.attached.adapter.select(path);
+			}
+		}
 	}
 
 	moveTemporaryVisibility(oldPath: string, newPath: string): void {
@@ -262,19 +306,21 @@ export class ExplorerController {
 			);
 			if (disposeSorting !== null) {
 				disposers.push(disposeSorting);
-				const disposePrefixHandles = adapter.installPrefixHandles({
-					isOrdered: (path) => this.isOrderedPrefixPath(path),
-					onReorder: (request) => this.reorderPrefix(request),
+				const disposePinnedItems = adapter.installPinnedItems({
+					isInteractionEnabled: () => !this.forceGlobal,
+					isPinned: (path) => this.isPinnedPath(path),
+					onReorder: (request) => this.applyPinnedReorder(attached, request),
+					onUnpin: (path) => this.unpinDroppedItem(attached, path),
 				});
-				if (disposePrefixHandles !== null) {
-					disposers.push(disposePrefixHandles);
+				if (disposePinnedItems !== null) {
+					disposers.push(disposePinnedItems);
 				}
 			}
 
 			let renderCount = 0;
 			const disposeRenderObserver = adapter.observeRenders(() => {
 				renderCount += 1;
-				adapter.refreshPrefixHandles();
+				adapter.refreshPinnedItems();
 				this.applyVisibility(attached);
 			});
 			if (disposeRenderObserver !== null) {
@@ -332,8 +378,8 @@ export class ExplorerController {
 		return attached;
 	}
 
-	private isOrderedPrefixPath(path: string): boolean {
-		if (this.forceGlobal || path.length === 0) {
+	private isPinnedPath(path: string): boolean {
+		if (path.length === 0) {
 			return false;
 		}
 		const folderPath = parentOf(path);
@@ -344,8 +390,9 @@ export class ExplorerController {
 		);
 	}
 
-	private async reorderPrefix(
-		request: PrefixReorderRequest,
+	private async applyPinnedReorder(
+		attached: AttachedExplorer,
+		request: PinnedReorderRequest,
 	): Promise<boolean> {
 		if (
 			this.forceGlobal ||
@@ -353,7 +400,7 @@ export class ExplorerController {
 		) {
 			return false;
 		}
-		const changed = reorderPrefixItem(
+		const changed = reorderPinnedItem(
 			this.getSettings(),
 			parentOf(request.sourcePath),
 			nameOf(request.sourcePath),
@@ -364,6 +411,20 @@ export class ExplorerController {
 			return false;
 		}
 		await this.saveSettings();
+		attached.adapter.select(request.sourcePath);
+		return true;
+	}
+
+	private async unpinDroppedItem(
+		attached: AttachedExplorer,
+		path: string,
+	): Promise<boolean> {
+		if (this.forceGlobal || !this.isPinnedPath(path)) {
+			return false;
+		}
+		unpinItem(this.getSettings(), parentOf(path), nameOf(path));
+		await this.saveSettings();
+		attached.adapter.select(path);
 		return true;
 	}
 

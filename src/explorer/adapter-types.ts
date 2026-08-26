@@ -39,17 +39,19 @@ export interface ToolbarAction {
 	getPressed?: () => boolean;
 }
 
-export type PrefixDropPosition = 'before' | 'after';
+export type PinnedDropPosition = 'before' | 'after';
 
-export interface PrefixReorderRequest {
+export interface PinnedReorderRequest {
 	sourcePath: string;
 	targetPath: string;
-	position: PrefixDropPosition;
+	position: PinnedDropPosition;
 }
 
-export interface PrefixHandleOptions {
-	isOrdered(path: string): boolean;
-	onReorder(request: PrefixReorderRequest): boolean | Promise<boolean>;
+export interface PinnedItemOptions {
+	isInteractionEnabled(): boolean;
+	isPinned(path: string): boolean;
+	onReorder(request: PinnedReorderRequest): boolean | Promise<boolean>;
+	onUnpin(path: string): boolean | Promise<boolean>;
 }
 
 export type SortingOptionsProvider = (
@@ -65,13 +67,12 @@ export interface ExplorerAdapter {
 	getItems(): ExplorerItemSnapshot[];
 	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
 	getSortMode(): CoreSortMode | null;
-	installPrefixHandles(options: PrefixHandleOptions): (() => void) | null;
+	installPinnedItems(options: PinnedItemOptions): (() => void) | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;
 	isItemVisible(path: string): boolean;
 	observeRenders(callback: () => void): (() => void) | null;
-	refreshPrefixHandles(): void;
+	refreshPinnedItems(): void;
 	refreshToolbarActions(): void;
-	restorePrefixHandleFocus(path: string): void;
 	runOriginalSort(): boolean;
 	scrollTo(path: string): boolean;
 	select(path: string): boolean;

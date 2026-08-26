@@ -25,4 +25,18 @@ export function registerCommands(
 		name: 'Toggle force global sorting',
 		callback: () => getController()?.toggleForceGlobal(),
 	});
+	plugin.addCommand({
+		id: 'move-pinned-item-up',
+		name: 'Move pinned item up',
+		callback: () => {
+			void getController()?.moveSelectedPinnedItem(-1);
+		},
+	});
+	plugin.addCommand({
+		id: 'move-pinned-item-down',
+		name: 'Move pinned item down',
+		callback: () => {
+			void getController()?.moveSelectedPinnedItem(1);
+		},
+	});
 }
