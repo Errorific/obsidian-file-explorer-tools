@@ -53,6 +53,7 @@ interface InternalExplorerView {
 	fileItems?: unknown;
 	getSortedFolderItems?: UnknownFunction;
 	headerDom?: InternalExplorerHeader;
+	lastDropTargetEl?: unknown;
 	navFileContainerEl?: Node;
 	sort?: UnknownFunction;
 	sortOrder?: unknown;
@@ -288,6 +289,9 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		const controller = new PinnedItemController(
 			container,
 			document,
+			() => {
+				this.view.lastDropTargetEl = null;
+			},
 			() =>
 				(this.readItems() ?? []).map((item) => ({
 					...item,
@@ -564,6 +568,7 @@ interface PinnedIndicatorEntry {
 }
 
 interface RenderedPinnedItem {
+	afterElement: HTMLElement;
 	folder: boolean;
 	isSelected(): boolean;
 	path: string;
@@ -575,7 +580,7 @@ type PinnedDropAction =
 	| { sourcePath: string; targetPath: string; type: 'unpin' };
 
 class PinnedItemController {
-	private readonly decoratedRows = new Set<HTMLElement>();
+	private readonly decoratedElements = new Set<HTMLElement>();
 	private readonly indicators = new Map<string, PinnedIndicatorEntry>();
 	private readonly renderedItems = new Map<string, RenderedPinnedItem>();
 	private itemsByRow = new WeakMap<HTMLElement, RenderedPinnedItem>();
@@ -585,6 +590,7 @@ class PinnedItemController {
 	constructor(
 		private readonly container: HTMLElement,
 		private readonly document: Document,
+		private readonly clearNativeDropTarget: () => void,
 		private readonly readItems: () => Array<{
 			isSelected(): boolean;
 			path: string;
@@ -595,6 +601,7 @@ class PinnedItemController {
 
 	attach(): void {
 		this.container.addEventListener('dragstart', this.onDragStart, true);
+		this.container.addEventListener('dragenter', this.onDragOver, true);
 		this.container.addEventListener('dragover', this.onDragOver, true);
 		this.container.addEventListener('drop', this.onDrop, true);
 		this.container.addEventListener('dragend', this.onDragEnd, true);
@@ -604,6 +611,7 @@ class PinnedItemController {
 	dispose(): void {
 		this.disposed = true;
 		this.container.removeEventListener('dragstart', this.onDragStart, true);
+		this.container.removeEventListener('dragenter', this.onDragOver, true);
 		this.container.removeEventListener('dragover', this.onDragOver, true);
 		this.container.removeEventListener('drop', this.onDrop, true);
 		this.container.removeEventListener('dragend', this.onDragEnd, true);
@@ -631,8 +639,10 @@ class PinnedItemController {
 			if (row === null) {
 				continue;
 			}
+			const folder = typeof item.value.setCollapsed === 'function';
 			const rendered = {
-				folder: typeof item.value.setCollapsed === 'function',
+				afterElement: folder ? readItemContainer(item.value, row) : row,
+				folder,
 				isSelected: () => item.isSelected(),
 				path: item.path,
 				row,
@@ -689,6 +699,7 @@ class PinnedItemController {
 		if (action === null) {
 			return;
 		}
+		this.clearNativeDropTarget();
 		event.preventDefault();
 		event.stopPropagation();
 		if (event.dataTransfer !== null) {
@@ -702,6 +713,7 @@ class PinnedItemController {
 		if (action === null) {
 			return;
 		}
+		this.clearNativeDropTarget();
 		event.preventDefault();
 		event.stopPropagation();
 		void this.applyDropAction(action);
@@ -745,6 +757,11 @@ class PinnedItemController {
 			return null;
 		}
 
+		const folderAfterAction = this.findFolderAfterAction(sourcePath, event);
+		if (folderAfterAction !== null) {
+			return folderAfterAction;
+		}
+
 		const target = this.findEventItem(event.target);
 		if (
 			target === null ||
@@ -784,6 +801,48 @@ class PinnedItemController {
 		};
 	}
 
+	private findFolderAfterAction(
+		sourcePath: string,
+		event: DragEvent,
+	): PinnedDropAction | null {
+		const eventElement = readEventElement(event.target);
+		if (eventElement === null) {
+			return null;
+		}
+		const sourceParent = parentOf(sourcePath);
+		for (const item of this.renderedItems.values()) {
+			if (
+				!item.folder ||
+				item.path === sourcePath ||
+				parentOf(item.path) !== sourceParent ||
+				!this.options.isPinned(item.path) ||
+				!item.afterElement.contains(eventElement)
+			) {
+				continue;
+			}
+			const bounds = readBounds(item.afterElement);
+			const rowBounds = readBounds(item.row);
+			if (bounds === null || rowBounds === null) {
+				continue;
+			}
+			const zoneHeight = Math.max(6, rowBounds.height / 3);
+			if (
+				event.clientY >= bounds.bottom - zoneHeight &&
+				event.clientY <= bounds.bottom
+			) {
+				return {
+					type: 'reorder',
+					request: {
+						position: 'after',
+						sourcePath,
+						targetPath: item.path,
+					},
+				};
+			}
+		}
+		return null;
+	}
+
 	private findEventItem(target: EventTarget | null): RenderedPinnedItem | null {
 		let element = readEventElement(target);
 		while (element !== null && this.container.contains(element)) {
@@ -802,7 +861,11 @@ class PinnedItemController {
 			return;
 		}
 		if (action.type === 'reorder') {
-			const target = this.renderedItems.get(action.request.targetPath)?.row;
+			const targetItem = this.renderedItems.get(action.request.targetPath);
+			const target =
+				action.request.position === 'after'
+					? targetItem?.afterElement
+					: targetItem?.row;
 			if (target === undefined) {
 				return;
 			}
@@ -811,7 +874,7 @@ class PinnedItemController {
 					? 'file-explorer-tools-pin-drop-before'
 					: 'file-explorer-tools-pin-drop-after',
 			);
-			this.decoratedRows.add(target);
+			this.decoratedElements.add(target);
 			return;
 		}
 
@@ -819,11 +882,11 @@ class PinnedItemController {
 		const target = this.renderedItems.get(action.targetPath)?.row;
 		if (source !== undefined) {
 			source.classList.add('file-explorer-tools-pinned-will-unpin');
-			this.decoratedRows.add(source);
+			this.decoratedElements.add(source);
 		}
 		if (target !== undefined) {
 			target.classList.add('file-explorer-tools-pin-drop-unpin');
-			this.decoratedRows.add(target);
+			this.decoratedElements.add(target);
 		}
 	}
 
@@ -845,10 +908,10 @@ class PinnedItemController {
 	}
 
 	private clearDropClasses(): void {
-		for (const row of this.decoratedRows) {
-			clearPinnedDropClasses(row);
+		for (const element of this.decoratedElements) {
+			clearPinnedDropClasses(element);
 		}
-		this.decoratedRows.clear();
+		this.decoratedElements.clear();
 	}
 
 	private clearDrag(): void {
@@ -887,6 +950,19 @@ function readItemElement(
 		};
 	}
 	return null;
+}
+
+function readItemContainer(
+	item: InternalExplorerItem,
+	row: HTMLElement,
+): HTMLElement {
+	for (const candidate of [item.el, item.selfEl, item.titleEl]) {
+		const element = readDomElement(candidate);
+		if (element !== null && element !== row && element.contains(row)) {
+			return element;
+		}
+	}
+	return row;
 }
 
 function readItemTitleRow(item: InternalExplorerItem): HTMLElement | null {

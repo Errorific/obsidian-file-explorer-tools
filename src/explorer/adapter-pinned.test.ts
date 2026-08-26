@@ -213,16 +213,18 @@ function createView() {
 	const pinnedTarget = createRow(document, 30, 60);
 	const ordinaryTarget = createRow(document, 60, 90);
 	const folderTarget = createRow(document, 90, 120, true);
-	const otherParentTarget = createRow(document, 120, 150);
-	for (const item of [
-		source,
-		pinnedTarget,
-		ordinaryTarget,
-		folderTarget,
-		otherParentTarget,
-	]) {
+	const folderChild = createRow(document, 120, 150);
+	const folderContainer = document.createElement('div');
+	folderContainer.classList.add('nav-folder');
+	folderContainer.setBounds(90, 150);
+	folderContainer.appendChild(folderTarget.row);
+	folderContainer.appendChild(folderChild.row);
+	const otherParentTarget = createRow(document, 150, 180);
+	for (const item of [source, pinnedTarget, ordinaryTarget]) {
 		container.appendChild(item.row);
 	}
+	container.appendChild(folderContainer);
+	container.appendChild(otherParentTarget.row);
 	const selected = new Set<unknown>();
 	const view = {
 		fileItems: {
@@ -239,22 +241,30 @@ function createView() {
 				file: { path: 'Projects/Ordinary.md' },
 			},
 			'Projects/Destination': {
-				collapsed: true,
+				collapsed: false,
+				el: folderContainer,
 				file: { path: 'Projects/Destination' },
 				setCollapsed: vi.fn(),
 				titleEl: folderTarget.row,
+			},
+			'Projects/Destination/Keep.md': {
+				el: folderChild.row,
+				file: { path: 'Projects/Destination/Keep.md' },
 			},
 			'Archive/Other.md': {
 				el: otherParentTarget.row,
 				file: { path: 'Archive/Other.md' },
 			},
 		},
+		lastDropTargetEl: { native: true },
 		navFileContainerEl: container,
 		sortOrder: 'alphabetical',
 		tree: { selectedDoms: selected },
 	};
 	return {
 		container,
+		folderChild,
+		folderContainer,
 		folderTarget,
 		otherParentTarget,
 		ordinaryTarget,
@@ -295,7 +305,9 @@ function installPinnedItems(
 	const dispose = adapter.installPinnedItems({
 		isInteractionEnabled: overrides.isInteractionEnabled ?? (() => true),
 		isPinned: (path) =>
-			path === 'Projects/First.md' || path === 'Projects/Second.md',
+			path === 'Projects/First.md' ||
+			path === 'Projects/Second.md' ||
+			path === 'Projects/Destination',
 		onReorder,
 		onUnpin,
 	});
@@ -414,6 +426,49 @@ describe('explorer pinned item interactions', () => {
 		expect(onUnpin).not.toHaveBeenCalled();
 	});
 
+	it('places after-folder drops below expanded subtrees without native expansion', async () => {
+		const {
+			container,
+			folderChild,
+			folderContainer,
+			folderTarget,
+			source,
+			view,
+		} = createView();
+		const { onReorder } = installPinnedItems(view);
+		container.dispatch('dragstart', createDragEvent(source.content, 15));
+
+		const beforeDrag = createDragEvent(folderTarget.content, 92);
+		container.dispatch('dragover', beforeDrag);
+		expect(beforeDrag.preventDefault).toHaveBeenCalledOnce();
+		expect(view.lastDropTargetEl).toBeNull();
+		expect(
+			folderTarget.row.classList.contains(
+				'file-explorer-tools-pin-drop-before',
+			),
+		).toBe(true);
+
+		view.lastDropTargetEl = { native: true };
+		const afterDrag = createDragEvent(folderChild.content, 148);
+		container.dispatch('dragover', afterDrag);
+		expect(afterDrag.preventDefault).toHaveBeenCalledOnce();
+		expect(view.lastDropTargetEl).toBeNull();
+		expect(
+			folderContainer.classList.contains(
+				'file-explorer-tools-pin-drop-after',
+			),
+		).toBe(true);
+
+		container.dispatch('drop', createDragEvent(folderChild.content, 148));
+		await vi.waitFor(() => {
+			expect(onReorder).toHaveBeenCalledWith({
+				position: 'after',
+				sourcePath: 'Projects/First.md',
+				targetPath: 'Projects/Destination',
+			});
+		});
+	});
+
 	it('unpins when dropped on an ordinary same-parent item', async () => {
 		const { container, ordinaryTarget, source, view } = createView();
 		const { onReorder, onUnpin } = installPinnedItems(view);
@@ -467,6 +522,7 @@ describe('explorer pinned item interactions', () => {
 		const { container, folderTarget, source, view } = createView();
 		const { onReorder, onUnpin } = installPinnedItems(view);
 		container.dispatch('dragstart', createDragEvent(source.content, 15));
+		const nativeDropTarget = view.lastDropTargetEl;
 		const dragOver = createDragEvent(folderTarget.content, 105);
 		container.dispatch('dragover', dragOver);
 		const drop = createDragEvent(folderTarget.content, 105);
@@ -475,6 +531,7 @@ describe('explorer pinned item interactions', () => {
 
 		expect(dragOver.preventDefault).not.toHaveBeenCalled();
 		expect(dragOver.stopPropagation).not.toHaveBeenCalled();
+		expect(view.lastDropTargetEl).toBe(nativeDropTarget);
 		expect(drop.preventDefault).not.toHaveBeenCalled();
 		expect(drop.stopPropagation).not.toHaveBeenCalled();
 		expect(onReorder).not.toHaveBeenCalled();

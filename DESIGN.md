@@ -447,7 +447,7 @@ The guarded integration reads the enabled `folder-notes` plugin's `folderNoteNam
 
 Status: Redesigned implementation and automated verification complete. Manual Obsidian verification is pending.
 
-Pinned items use a compact postfix status marker and direct **Pin** or **Unpin** context-menu actions. Desktop reordering uses the explorer row's native drag source. Capture-phase handlers intercept only same-parent reorder and unpin zones, while folder-center, cross-folder, and blank-space drops continue to Obsidian's native move handlers. Force-global sorting keeps pin markers visible but disables custom drops and move commands.
+Pinned items use a compact postfix status marker and direct **Pin** or **Unpin** context-menu actions. Desktop reordering uses the explorer row's native drag source. Capture-phase handlers intercept only same-parent reorder and unpin zones, while folder-center, cross-folder, and blank-space drops continue to Obsidian's native move handlers. A folder's after-position and indicator sit below its expanded subtree, and custom before/after zones suppress Obsidian's native hover expansion. Force-global sorting keeps pin markers visible but disables custom drops and move commands.
 
 - Add direct Pin and Unpin context-menu controls
 - Render postfix pin status markers without changing row dimensions
