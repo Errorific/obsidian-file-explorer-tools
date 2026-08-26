@@ -9,12 +9,16 @@ import {
 	type ExplorerLeafState,
 } from './leaf-state';
 import { createSortingOptions } from '../sorting/order';
+import { reorderPrefixItem } from '../sorting/prefix-controller';
 import {
 	getAncestorFolderPaths,
 	getFoldersToCollapse,
 } from '../navigation/path-state';
 import { createExplorerAdapter } from './adapter';
-import type { ExplorerAdapter } from './adapter-types';
+import type {
+	ExplorerAdapter,
+	PrefixReorderRequest,
+} from './adapter-types';
 import { formatCompatibilityReport } from './toolbar';
 
 const FILE_EXPLORER_VIEW_TYPE = 'file-explorer';
@@ -43,6 +47,7 @@ export interface ExplorerPluginHost {
 export interface ExplorerControllerOptions {
 	createAdapter?: (view: unknown) => ExplorerAdapter;
 	getSettings?: () => FileExplorerToolsSettings;
+	saveSettings?: () => Promise<void>;
 	showNotice: (message: string) => void;
 	folderNotes?: FolderNoteIntegration | null;
 }
@@ -57,6 +62,7 @@ export class ExplorerController {
 	private readonly attachedLeaves = new Map<ExplorerLeaf, AttachedExplorer>();
 	private readonly createAdapter: (view: unknown) => ExplorerAdapter;
 	private readonly getSettings: () => FileExplorerToolsSettings;
+	private readonly saveSettings: () => Promise<void>;
 	private readonly showNotice: (message: string) => void;
 	private readonly folderNotes: FolderNoteIntegration | null;
 	private disposed = false;
@@ -69,6 +75,7 @@ export class ExplorerController {
 	) {
 		this.createAdapter = options.createAdapter ?? createExplorerAdapter;
 		this.getSettings = options.getSettings ?? (() => DEFAULT_SETTINGS);
+		this.saveSettings = options.saveSettings ?? (async () => undefined);
 		this.showNotice = options.showNotice;
 		this.folderNotes = options.folderNotes ?? null;
 	}
@@ -121,6 +128,7 @@ export class ExplorerController {
 	refreshSorting(): void {
 		for (const attached of this.attachedLeaves.values()) {
 			attached.adapter.runOriginalSort();
+			attached.adapter.refreshPrefixHandles();
 			this.applyVisibility(attached);
 		}
 	}
@@ -128,6 +136,12 @@ export class ExplorerController {
 	refreshVisibility(): void {
 		for (const attached of this.attachedLeaves.values()) {
 			this.applyVisibility(attached);
+		}
+	}
+
+	restorePrefixHandleFocus(path: string): void {
+		for (const attached of this.attachedLeaves.values()) {
+			attached.adapter.restorePrefixHandleFocus(path);
 		}
 	}
 
@@ -249,9 +263,18 @@ export class ExplorerController {
 				disposers.push(disposeSorting);
 			}
 
+			const disposePrefixHandles = adapter.installPrefixHandles({
+				isOrdered: (path) => this.isOrderedPrefixPath(path),
+				onReorder: (request) => this.reorderPrefix(request),
+			});
+			if (disposePrefixHandles !== null) {
+				disposers.push(disposePrefixHandles);
+			}
+
 			let renderCount = 0;
 			const disposeRenderObserver = adapter.observeRenders(() => {
 				renderCount += 1;
+				adapter.refreshPrefixHandles();
 				this.applyVisibility(attached);
 			});
 			if (disposeRenderObserver !== null) {
@@ -307,6 +330,41 @@ export class ExplorerController {
 		}
 
 		return attached;
+	}
+
+	private isOrderedPrefixPath(path: string): boolean {
+		if (this.forceGlobal || path.length === 0) {
+			return false;
+		}
+		const folderPath = parentOf(path);
+		return (
+			this.getSettings().folders[folderPath]?.orderedPrefix.includes(
+				nameOf(path),
+			) ?? false
+		);
+	}
+
+	private async reorderPrefix(
+		request: PrefixReorderRequest,
+	): Promise<boolean> {
+		if (
+			this.forceGlobal ||
+			parentOf(request.sourcePath) !== parentOf(request.targetPath)
+		) {
+			return false;
+		}
+		const changed = reorderPrefixItem(
+			this.getSettings(),
+			parentOf(request.sourcePath),
+			nameOf(request.sourcePath),
+			nameOf(request.targetPath),
+			request.position,
+		);
+		if (!changed) {
+			return false;
+		}
+		await this.saveSettings();
+		return true;
 	}
 
 	private collapseAttachedExplorer(
@@ -377,6 +435,16 @@ export class ExplorerController {
 			this.applyVisibility(attached);
 		}
 	}
+}
+
+function parentOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? '' : path.slice(0, separatorIndex);
+}
+
+function nameOf(path: string): string {
+	const separatorIndex = path.lastIndexOf('/');
+	return separatorIndex < 0 ? path : path.slice(separatorIndex + 1);
 }
 
 function isPathOrDescendant(path: string, ancestor: string): boolean {

@@ -17,6 +17,7 @@ interface PrefixMenuHost {
 		};
 	};
 	registerEvent(event: EventRef): void;
+	restorePrefixHandleFocus(path: string): void;
 	saveSettings(): Promise<void>;
 	settings: FileExplorerToolsSettings;
 }
@@ -32,7 +33,10 @@ export function registerPrefixMenu(host: PrefixMenuHost): void {
 export function addPrefixMenu(
 	menu: Menu,
 	path: string,
-	host: Pick<PrefixMenuHost, 'saveSettings' | 'settings'>,
+	host: Pick<
+		PrefixMenuHost,
+		'restorePrefixHandleFocus' | 'saveSettings' | 'settings'
+	>,
 ): void {
 	const itemName = nameOf(path);
 	if (itemName === null) {
@@ -57,6 +61,7 @@ export function addPrefixMenu(
 			item.setTitle('Add to ordered prefix').onClick(async () => {
 				addPrefixItem(host.settings, folderPath, itemName);
 				await host.saveSettings();
+				host.restorePrefixHandleFocus(path);
 			});
 		});
 		return;
@@ -68,10 +73,20 @@ export function addPrefixMenu(
 			await host.saveSettings();
 		});
 	});
-	addMoveAction(actionMenu, host, folderPath, itemName, 'Move up', -1, prefixIndex === 0);
 	addMoveAction(
 		actionMenu,
 		host,
+		path,
+		folderPath,
+		itemName,
+		'Move up',
+		-1,
+		prefixIndex === 0,
+	);
+	addMoveAction(
+		actionMenu,
+		host,
+		path,
 		folderPath,
 		itemName,
 		'Move down',
@@ -82,7 +97,11 @@ export function addPrefixMenu(
 
 function addMoveAction(
 	menu: Menu,
-	host: Pick<PrefixMenuHost, 'saveSettings' | 'settings'>,
+	host: Pick<
+		PrefixMenuHost,
+		'restorePrefixHandleFocus' | 'saveSettings' | 'settings'
+	>,
+	path: string,
 	folderPath: string,
 	itemName: string,
 	title: string,
@@ -96,6 +115,7 @@ function addMoveAction(
 			.onClick(async () => {
 				if (movePrefixItem(host.settings, folderPath, itemName, offset)) {
 					await host.saveSettings();
+					host.restorePrefixHandleFocus(path);
 				}
 			});
 	});

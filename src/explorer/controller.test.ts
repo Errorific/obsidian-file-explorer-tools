@@ -19,7 +19,9 @@ const settings: FileExplorerToolsSettings = {
 function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 	const actions: ToolbarAction[] = [];
 	const disposeObserver = vi.fn();
+	const disposePrefixHandles = vi.fn();
 	const disposeToolbar = vi.fn();
+	let renderCallback: (() => void) | null = null;
 	const getCompatibilityReport: ExplorerAdapter['getCompatibilityReport'] =
 		vi.fn<ExplorerAdapter['getCompatibilityReport']>(() => ({
 			available: true,
@@ -30,9 +32,14 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 	const getSortMode: ExplorerAdapter['getSortMode'] =
 		vi.fn<ExplorerAdapter['getSortMode']>(() => 'alphabetical');
 	const installPrefixHandles: ExplorerAdapter['installPrefixHandles'] = vi.fn(
-		() => vi.fn(),
+		() => disposePrefixHandles,
 	);
 	const installSorting: ExplorerAdapter['installSorting'] = vi.fn(() => vi.fn());
+	const observeRenders: ExplorerAdapter['observeRenders'] =
+		vi.fn<ExplorerAdapter['observeRenders']>((callback) => {
+			renderCallback = callback;
+			return disposeObserver;
+		});
 	const refreshPrefixHandles = vi.fn();
 	const restorePrefixHandleFocus = vi.fn();
 	const runOriginalSort: ExplorerAdapter['runOriginalSort'] = vi.fn(() => true);
@@ -59,7 +66,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		installPrefixHandles,
 		installSorting,
 		isItemVisible,
-		observeRenders: vi.fn(() => disposeObserver),
+		observeRenders,
 		refreshPrefixHandles,
 		refreshToolbarActions,
 		restorePrefixHandleFocus,
@@ -73,6 +80,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		adapter,
 		collapse,
 		disposeObserver,
+		disposePrefixHandles,
 		disposeToolbar,
 		expand,
 		installPrefixHandles,
@@ -84,6 +92,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		runOriginalSort,
 		scrollTo,
 		select,
+		triggerRender: () => renderCallback?.(),
 	};
 }
 
@@ -173,6 +182,99 @@ describe('ExplorerController', () => {
 		controller.dispose();
 		expect(disposeToolbar).toHaveBeenCalledTimes(3);
 		expect(disposeObserver).toHaveBeenCalledOnce();
+	});
+
+	it('installs, refreshes, and disposes prefix handles for each leaf', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const prefixSettings = {
+			...settings,
+			folders: {
+				Projects: { orderedPrefix: ['First.md'] },
+			},
+		};
+		const {
+			adapter,
+			disposePrefixHandles,
+			installPrefixHandles,
+			refreshPrefixHandles,
+			triggerRender,
+		} = createAdapter();
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => prefixSettings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		const options = vi.mocked(installPrefixHandles).mock.calls[0]?.[0];
+		expect(options?.isOrdered('Projects/First.md')).toBe(true);
+		expect(options?.isOrdered('Projects/Other.md')).toBe(false);
+
+		triggerRender();
+		expect(refreshPrefixHandles).toHaveBeenCalledOnce();
+		controller.toggleForceGlobal();
+		expect(options?.isOrdered('Projects/First.md')).toBe(false);
+		expect(refreshPrefixHandles).toHaveBeenCalledTimes(2);
+
+		controller.dispose();
+		expect(disposePrefixHandles).toHaveBeenCalledOnce();
+	});
+
+	it('persists handle reordering and restores handle focus', async () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf]);
+		const prefixSettings = {
+			...settings,
+			folders: {
+				Projects: {
+					orderedPrefix: ['First.md', 'Second.md', 'Third.md'],
+				},
+			},
+		};
+		const saveSettings = vi.fn(async () => undefined);
+		const {
+			adapter,
+			installPrefixHandles,
+			restorePrefixHandleFocus,
+		} = createAdapter();
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			getSettings: () => prefixSettings,
+			saveSettings,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		const options = vi.mocked(installPrefixHandles).mock.calls[0]?.[0];
+		expect(
+			await options?.onReorder({
+				position: 'before',
+				sourcePath: 'Projects/Third.md',
+				targetPath: 'Projects/First.md',
+			}),
+		).toBe(true);
+		expect(prefixSettings.folders.Projects.orderedPrefix).toEqual([
+			'Third.md',
+			'First.md',
+			'Second.md',
+		]);
+		expect(saveSettings).toHaveBeenCalledOnce();
+
+		controller.restorePrefixHandleFocus('Projects/Third.md');
+		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
+			'Projects/Third.md',
+		);
+		expect(
+			await options?.onReorder({
+				position: 'after',
+				sourcePath: 'Projects/Third.md',
+				targetPath: 'Archive/Other.md',
+			}),
+		).toBe(false);
+		expect(saveSettings).toHaveBeenCalledOnce();
 	});
 
 	it('attaches added leaves and disposes removed leaves', () => {

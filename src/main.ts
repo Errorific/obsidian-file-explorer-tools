@@ -10,6 +10,7 @@ import { applyDelete, applyRename } from './settings-events';
 import { registerHiddenItemMenu } from './hiding/menu';
 import { createFolderNoteIntegration } from './integrations/folder-notes';
 import { registerFolderSortMenu } from './sorting/folder-menu';
+import { registerPrefixMenu } from './sorting/prefix-menu';
 import { FileExplorerToolsSettingsTab } from './ui/settings-tab';
 
 export default class FileExplorerToolsPlugin extends Plugin {
@@ -31,6 +32,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.addSettingTab(new FileExplorerToolsSettingsTab(this.app, this));
 		this.explorerController = new ExplorerController(this, {
 			getSettings: () => this.settings,
+			saveSettings: () => this.saveSettings(),
 			showNotice: (message) => new Notice(message),
 			folderNotes: {
 				getAssociatedFolderPath: (file) =>
@@ -40,6 +42,7 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		});
 		registerCommands(this, () => this.explorerController);
 		registerFolderSortMenu(this);
+		registerPrefixMenu(this);
 		registerHiddenItemMenu(this);
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) {
@@ -77,6 +80,10 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.unloaded = true;
 		this.explorerController?.dispose();
 		this.explorerController = null;
+	}
+
+	restorePrefixHandleFocus(path: string): void {
+		this.explorerController?.restorePrefixHandleFocus(path);
 	}
 
 	async saveSettings(): Promise<void> {

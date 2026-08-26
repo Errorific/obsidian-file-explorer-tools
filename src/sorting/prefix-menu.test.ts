@@ -75,9 +75,11 @@ describe('addPrefixMenu', () => {
 	it('adds an item to its parent ordered prefix', async () => {
 		const { items, menu, submenuItems } = createMenu();
 		const settings = loadSettings(undefined);
+		const restorePrefixHandleFocus = vi.fn();
 		const saveSettings = vi.fn(async () => undefined);
 
 		addPrefixMenu(menu, 'Projects/Current.md', {
+			restorePrefixHandleFocus,
 			saveSettings,
 			settings,
 		});
@@ -96,6 +98,9 @@ describe('addPrefixMenu', () => {
 
 		expect(settings.folders.Projects?.orderedPrefix).toEqual(['Current.md']);
 		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
+			'Projects/Current.md',
+		);
 	});
 
 	it('removes a prefix item without removing its parent sort override', async () => {
@@ -110,7 +115,11 @@ describe('addPrefixMenu', () => {
 		});
 		const saveSettings = vi.fn(async () => undefined);
 
-		addPrefixMenu(menu, 'Projects/Current.md', { saveSettings, settings });
+		addPrefixMenu(menu, 'Projects/Current.md', {
+			restorePrefixHandleFocus: vi.fn(),
+			saveSettings,
+			settings,
+		});
 		expect(submenuItems.map(({ title }) => title)).toEqual([
 			'Remove from ordered prefix',
 			'Move up',
@@ -135,9 +144,14 @@ describe('addPrefixMenu', () => {
 				},
 			},
 		});
+		const restorePrefixHandleFocus = vi.fn();
 		const saveSettings = vi.fn(async () => undefined);
 
-		addPrefixMenu(menu, 'Projects/Second.md', { saveSettings, settings });
+		addPrefixMenu(menu, 'Projects/Second.md', {
+			restorePrefixHandleFocus,
+			saveSettings,
+			settings,
+		});
 
 		expect(submenuItems[1]).toMatchObject({ disabled: false, title: 'Move up' });
 		expect(submenuItems[2]).toMatchObject({ disabled: false, title: 'Move down' });
@@ -148,9 +162,16 @@ describe('addPrefixMenu', () => {
 			'Third.md',
 		]);
 		expect(saveSettings).toHaveBeenCalledOnce();
+		expect(restorePrefixHandleFocus).toHaveBeenCalledWith(
+			'Projects/Second.md',
+		);
 
 		const first = createMenu();
-		addPrefixMenu(first.menu, 'Projects/Second.md', { saveSettings, settings });
+		addPrefixMenu(first.menu, 'Projects/Second.md', {
+			restorePrefixHandleFocus,
+			saveSettings,
+			settings,
+		});
 		expect(first.submenuItems[1]).toMatchObject({ disabled: true, title: 'Move up' });
 		expect(first.submenuItems[2]).toMatchObject({
 			disabled: false,
@@ -162,6 +183,7 @@ describe('addPrefixMenu', () => {
 		const { items, menu, submenuItems } = createMenu(false);
 
 		addPrefixMenu(menu, 'Current.md', {
+			restorePrefixHandleFocus: vi.fn(),
 			saveSettings: vi.fn(),
 			settings: loadSettings(undefined),
 		});
@@ -177,6 +199,7 @@ describe('addPrefixMenu', () => {
 		const { items, menu } = createMenu();
 
 		addPrefixMenu(menu, '', {
+			restorePrefixHandleFocus: vi.fn(),
 			saveSettings: vi.fn(),
 			settings: loadSettings(undefined),
 		});
