@@ -20,26 +20,18 @@ The plugin works directly with Obsidian's file explorer, so your existing layout
 
 ## Installation
 
-Until the first release is published, install File Explorer Tools from source:
+Install File Explorer Tools from its [latest GitHub release](https://github.com/Errorific/obsidian-file-explorer-tools/releases/latest):
 
-1. Clone this repository.
-2. Install the pinned Node.js and npm versions, install dependencies, and build the plugin:
-
-   ```sh
-   mise install
-   npm ci
-   npm run build
-   ```
-
-3. Create this folder inside your vault:
+1. Download `main.js`, `manifest.json`, and `styles.css` from the release assets.
+2. Create this folder inside your vault:
 
    ```text
    <Vault>/.obsidian/plugins/file-explorer-tools/
    ```
 
-4. Copy `main.js`, `manifest.json`, and `styles.css` from the repository into that folder.
-5. Reload Obsidian.
-6. Open **Settings → Community plugins** and enable **File Explorer Tools**.
+3. Copy the downloaded files into that folder.
+4. Reload Obsidian.
+5. Open **Settings → Community plugins** and enable **File Explorer Tools**.
 
 File Explorer Tools currently supports desktop Obsidian only.
 
@@ -158,6 +150,28 @@ npm test
 npm run lint
 npm run build
 ```
+
+### Release process
+
+1. Create a branch from the latest `main`.
+2. Update the version without creating a tag:
+
+   ```sh
+   npm version <version> --no-git-tag-version
+   ```
+
+3. Run the automated checks, commit the version files, and merge the pull request.
+4. Tag the merged commit on `main` with the exact version from `manifest.json`, without a `v` prefix:
+
+   ```sh
+   git tag -a <version> -m "Release <version>"
+   git push origin <version>
+   ```
+
+5. Wait for the release workflow to build the plugin and create a draft GitHub release.
+6. Verify that `main.js`, `manifest.json`, and `styles.css` are attached, then publish the draft.
+
+Build provenance is generated when the repository is public. Private repositories skip that step and still create the draft release.
 
 ## License
 

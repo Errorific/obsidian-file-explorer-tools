@@ -32,6 +32,7 @@ jobs:
                   [ -f styles.css ] && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
 
             - name: Attest build provenance
+              if: github.event.repository.visibility == 'public'
               uses: actions/attest@v4
               with:
                   subject-path: |
