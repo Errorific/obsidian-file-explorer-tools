@@ -239,10 +239,17 @@ export class ExplorerController {
 			if (leaf !== undefined && candidate !== leaf) {
 				continue;
 			}
-			const item = attached.adapter
+			const associatedFolder = this.folderNotes?.getAssociatedFolderPath(file);
+			const selectedItem = attached.adapter
 				.getItems()
-				.find(({ path }) => path === file.path);
-			if (item?.selected && attached.adapter.isItemVisible(file.path)) {
+				.find(
+					({ path, selected }) =>
+						selected && (path === file.path || path === associatedFolder),
+				);
+			if (
+				selectedItem !== undefined &&
+				attached.adapter.isItemVisible(selectedItem.path)
+			) {
 				this.collapseAttachedExplorer(attached, file);
 				continue;
 			}

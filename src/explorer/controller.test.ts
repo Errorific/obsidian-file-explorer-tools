@@ -851,6 +851,45 @@ describe('ExplorerController', () => {
 		expect(collapse).not.toHaveBeenCalled();
 	});
 
+	it('collapses unrelated folders when an associated folder is selected and visible', () => {
+		const activeFile = createFile('Projects/Active.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const collapse = vi.fn(() => true);
+		const scrollTo = vi.fn(() => true);
+		const select = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			collapse,
+			getItems: vi.fn(() => [
+				{ path: 'Projects', folder: true, collapsed: false, selected: false },
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: true,
+				},
+				{ path: 'Archive', folder: true, collapsed: false, selected: false },
+			]),
+			isItemVisible: vi.fn((path) => path === 'Projects/Active'),
+			scrollTo,
+			select,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			folderNotes: { getAssociatedFolderPath: () => 'Projects/Active' },
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		expect(collapse).toHaveBeenCalledOnce();
+		expect(collapse).toHaveBeenCalledWith('Archive');
+		expect(scrollTo).not.toHaveBeenCalled();
+		expect(select).not.toHaveBeenCalled();
+	});
+
 	it('preserves an associated folder subtree during explicit collapse', () => {
 		const activeFile = createFile('Projects/Active.md');
 		const leaf = { view: {} };
