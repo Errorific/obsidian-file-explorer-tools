@@ -239,10 +239,18 @@ export class ExplorerController {
 			if (leaf !== undefined && candidate !== leaf) {
 				continue;
 			}
-			const item = attached.adapter
+			const associatedFolder = this.folderNotes?.getAssociatedFolderPath(file);
+			const targetPath = associatedFolder ?? file.path;
+			const selectedItem = attached.adapter
 				.getItems()
-				.find(({ path }) => path === file.path);
-			if (item?.selected && attached.adapter.isItemVisible(file.path)) {
+				.find(
+					({ path, selected }) =>
+						selected && (path === file.path || path === associatedFolder),
+				);
+			if (
+				selectedItem !== undefined &&
+				attached.adapter.isItemVisible(selectedItem.path)
+			) {
 				this.collapseAttachedExplorer(attached, file);
 				continue;
 			}
@@ -251,11 +259,11 @@ export class ExplorerController {
 				attached.state.temporaryVisiblePaths.add(path);
 			}
 			this.applyVisibility(attached);
-			for (const path of getAncestorFolderPaths(file.path)) {
+			for (const path of getAncestorFolderPaths(targetPath)) {
 				attached.adapter.expand(path);
 			}
-			attached.adapter.scrollTo(file.path);
-			attached.adapter.select(file.path);
+			attached.adapter.scrollTo(targetPath);
+			attached.adapter.select(targetPath);
 		}
 	}
 

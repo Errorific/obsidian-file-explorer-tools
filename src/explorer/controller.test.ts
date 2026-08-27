@@ -87,6 +87,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		installPinnedItems,
 		installSorting,
 		isItemVisible,
+		observeRenders,
 		refreshPinnedItems,
 		refreshToolbarActions,
 		runOriginalSort,
@@ -302,6 +303,28 @@ describe('ExplorerController', () => {
 		expect(persistSettings).toHaveBeenCalledTimes(2);
 	});
 
+	it('does not duplicate resources on repeated layout changes', () => {
+		const leaf = { view: {} };
+		const { host, triggerLayoutChange, triggerLayoutReady } = createHost([leaf]);
+		const { adapter, installPinnedItems, installSorting, observeRenders } =
+			createAdapter();
+		const createAdapterForView = vi.fn(() => adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		triggerLayoutChange();
+		triggerLayoutChange();
+
+		expect(createAdapterForView).toHaveBeenCalledOnce();
+		expect(installSorting).toHaveBeenCalledOnce();
+		expect(installPinnedItems).toHaveBeenCalledOnce();
+		expect(observeRenders).toHaveBeenCalledOnce();
+	});
+
 	it('attaches added leaves and disposes removed leaves', () => {
 		const firstLeaf = { view: { id: 'first' } };
 		const secondLeaf = { view: { id: 'second' } };
@@ -407,11 +430,20 @@ describe('ExplorerController', () => {
 		expect(registerEvent).not.toHaveBeenCalled();
 	});
 
-	it('shares force-global sorting across attached and later leaves', () => {
+	it('uses core sort changes during force-global sorting and restores folder settings', () => {
 		const firstLeaf = { view: { id: 'first' } };
 		const secondLeaf = { view: { id: 'second' } };
 		const { host, setLeaves, triggerLayoutChange, triggerLayoutReady } =
 			createHost([firstLeaf]);
+		const configuredSettings = {
+			...settings,
+			folders: {
+				Projects: {
+					orderedPrefix: ['Pinned.md'],
+					sortMode: 'created-ascending' as const,
+				},
+			},
+		};
 		const first = createAdapter();
 		const second = createAdapter();
 		const createAdapterForView = vi
@@ -420,7 +452,7 @@ describe('ExplorerController', () => {
 			.mockReturnValueOnce(second.adapter);
 		const controller = new ExplorerController(host, {
 			createAdapter: createAdapterForView,
-			getSettings: () => settings,
+			getSettings: () => configuredSettings,
 			showNotice: vi.fn(),
 		});
 
@@ -431,21 +463,37 @@ describe('ExplorerController', () => {
 			'Locate current file',
 			'Toggle force global sorting',
 		]);
+		const firstProvider = vi.mocked(first.installSorting).mock.calls[0]?.[0];
+		expect(firstProvider?.('Projects', 'alphabetical')).toMatchObject({
+			sortMode: 'created-ascending',
+			prefixPositions: new Map([['Pinned.md', 0]]),
+		});
+
 		first.actions
 			.find((action) => action.title === 'Toggle force global sorting')
 			?.callback();
 
 		expect(controller.isForceGlobal()).toBe(true);
+		expect(firstProvider?.('Projects', 'byModifiedTimeReverse')).toMatchObject({
+			sortMode: 'modified-ascending',
+			prefixPositions: new Map(),
+		});
 		expect(first.runOriginalSort).toHaveBeenCalledTimes(2);
 
 		setLeaves([firstLeaf, secondLeaf]);
 		triggerLayoutChange();
-		const provider = vi.mocked(second.installSorting).mock.calls[0]?.[0];
-		expect(provider?.('', 'alphabetical')).toMatchObject({
-			sortMode: 'name-ascending',
+		const secondProvider = vi.mocked(second.installSorting).mock.calls[0]?.[0];
+		expect(secondProvider?.('Projects', 'alphabeticalReverse')).toMatchObject({
+			sortMode: 'name-descending',
 			prefixPositions: new Map(),
 		});
 		expect(second.runOriginalSort).toHaveBeenCalledOnce();
+
+		controller.toggleForceGlobal();
+		expect(firstProvider?.('Projects', 'alphabeticalReverse')).toMatchObject({
+			sortMode: 'created-ascending',
+			prefixPositions: new Map([['Pinned.md', 0]]),
+		});
 	});
 
 	it('keeps the open hidden file visible when reveal mode is toggled', () => {
@@ -581,6 +629,39 @@ describe('ExplorerController', () => {
 			dimmed: true,
 			marked: false,
 		});
+	});
+
+	it('keeps toolbar reveal state independent between explorer leaves', () => {
+		const firstLeaf = { view: { id: 'first' } };
+		const secondLeaf = { view: { id: 'second' } };
+		const { host, triggerLayoutReady } = createHost([firstLeaf, secondLeaf]);
+		const first = createAdapter();
+		const second = createAdapter();
+		const createAdapterForView = vi
+			.fn()
+			.mockReturnValueOnce(first.adapter)
+			.mockReturnValueOnce(second.adapter);
+		const controller = new ExplorerController(host, {
+			createAdapter: createAdapterForView,
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		first.actions
+			.find((action) => action.title === 'Toggle hidden items')
+			?.callback();
+
+		expect(
+			first.actions.find((action) => action.title === 'Toggle hidden items')
+				?.getPressed?.(),
+		).toBe(true);
+		expect(
+			second.actions.find((action) => action.title === 'Toggle hidden items')
+				?.getPressed?.(),
+		).toBe(false);
+		expect(first.refreshToolbarActions).toHaveBeenCalledOnce();
+		expect(second.refreshToolbarActions).not.toHaveBeenCalled();
 	});
 
 	it('toggles hidden items in every explorer from a command', () => {
@@ -768,6 +849,81 @@ describe('ExplorerController', () => {
 		expect(scrollTo).toHaveBeenCalledWith(activeFile.path);
 		expect(select).toHaveBeenCalledWith(activeFile.path);
 		expect(collapse).not.toHaveBeenCalled();
+	});
+
+	it('locates a folder note through its associated folder', () => {
+		const activeFile = createFile('Projects/Active.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const expand = vi.fn(() => true);
+		const scrollTo = vi.fn(() => true);
+		const select = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			expand,
+			getItems: vi.fn(() => [
+				{ path: 'Projects', folder: true, collapsed: false, selected: false },
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: false,
+				},
+			]),
+			scrollTo,
+			select,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			folderNotes: { getAssociatedFolderPath: () => 'Projects/Active' },
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		expect(expand).toHaveBeenCalledWith('Projects');
+		expect(scrollTo).toHaveBeenCalledWith('Projects/Active');
+		expect(select).toHaveBeenCalledWith('Projects/Active');
+	});
+
+	it('collapses unrelated folders when an associated folder is selected and visible', () => {
+		const activeFile = createFile('Projects/Active.md');
+		const leaf = { view: {} };
+		const { host, triggerLayoutReady } = createHost([leaf], activeFile);
+		const collapse = vi.fn(() => true);
+		const scrollTo = vi.fn(() => true);
+		const select = vi.fn(() => true);
+		const { adapter } = createAdapter({
+			collapse,
+			getItems: vi.fn(() => [
+				{ path: 'Projects', folder: true, collapsed: false, selected: false },
+				{
+					path: 'Projects/Active',
+					folder: true,
+					collapsed: false,
+					selected: true,
+				},
+				{ path: 'Archive', folder: true, collapsed: false, selected: false },
+			]),
+			isItemVisible: vi.fn((path) => path === 'Projects/Active'),
+			scrollTo,
+			select,
+		});
+		const controller = new ExplorerController(host, {
+			createAdapter: () => adapter,
+			folderNotes: { getAssociatedFolderPath: () => 'Projects/Active' },
+			showNotice: vi.fn(),
+		});
+
+		controller.start();
+		triggerLayoutReady();
+		controller.locateCurrentFile();
+
+		expect(collapse).toHaveBeenCalledOnce();
+		expect(collapse).toHaveBeenCalledWith('Archive');
+		expect(scrollTo).not.toHaveBeenCalled();
+		expect(select).not.toHaveBeenCalled();
 	});
 
 	it('preserves an associated folder subtree during explicit collapse', () => {

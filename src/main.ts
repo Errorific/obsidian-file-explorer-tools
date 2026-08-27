@@ -28,6 +28,9 @@ export default class FileExplorerToolsPlugin extends Plugin {
 		this.settings = prepared.settings;
 		if (prepared.needsSave) {
 			await this.saveSettings();
+			if (this.unloaded) {
+				return;
+			}
 		}
 		this.addSettingTab(new FileExplorerToolsSettingsTab(this.app, this));
 		this.explorerController = new ExplorerController(this, {
