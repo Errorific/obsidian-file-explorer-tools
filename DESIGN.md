@@ -459,6 +459,8 @@ Pinned items use a compact postfix status marker and direct **Pin** or **Unpin**
 
 ### Phase 8: Desktop hardening
 
+Status: In progress. Automated hardening is complete; the manual Obsidian verification pass remains.
+
 - Test vault create, delete, rename, and cross-folder moves
 - Test plugin reload and unload for leaked patches or listeners
 - Test multiple explorer leaves
@@ -504,6 +506,7 @@ Every implementation phase must meet these criteria before it is considered comp
 
 ## Research notes
 
+- Phase 8 automated hardening added plugin lifecycle and vault-event wiring coverage, fixed initialization continuing after unload during an initial settings save, and added regression coverage for repeated explorer layout changes, per-leaf reveal state, hidden pinned-item moves, and core sort changes during force-global mode. Build, lint, and 151 tests pass with clean output. Manual Obsidian verification remains.
 - Phase 7 manual verification covered root and nested pinning, direct Pin and Unpin menus, postfix marker layout, command-palette movement and notices, force-global behavior, expanded and collapsed folder boundaries, native expansion suppression, drag-to-unpin, native folder moves with retained pin state, Folder Notes click behavior, and clean console output.
 - Flexplorer 4.0.5 uses native desktop drag events, capture-phase drop handling, pointer proximity for sibling insertion, a center folder drop zone, and a postfix pin indicator. It prevents every drop and performs moves through `fileManager.renameFile()`. File Explorer Tools adopts the narrow event and drop-zone observations but intercepts only same-parent pin operations so Obsidian remains responsible for native folder and vault-root moves.
 - Obsidian 1.13.7 exposes the built-in explorer as a singleton, so multi-leaf behavior is covered by adapter tests but not manual verification.
