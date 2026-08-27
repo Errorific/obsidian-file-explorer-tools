@@ -240,6 +240,7 @@ export class ExplorerController {
 				continue;
 			}
 			const associatedFolder = this.folderNotes?.getAssociatedFolderPath(file);
+			const targetPath = associatedFolder ?? file.path;
 			const selectedItem = attached.adapter
 				.getItems()
 				.find(
@@ -258,11 +259,11 @@ export class ExplorerController {
 				attached.state.temporaryVisiblePaths.add(path);
 			}
 			this.applyVisibility(attached);
-			for (const path of getAncestorFolderPaths(file.path)) {
+			for (const path of getAncestorFolderPaths(targetPath)) {
 				attached.adapter.expand(path);
 			}
-			attached.adapter.scrollTo(file.path);
-			attached.adapter.select(file.path);
+			attached.adapter.scrollTo(targetPath);
+			attached.adapter.select(targetPath);
 		}
 	}
 
