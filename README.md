@@ -4,6 +4,9 @@ File Explorer Tools extends Obsidian's built-in file explorer with persistent hi
 
 The plugin works directly with Obsidian's file explorer, so your existing layout and workflows remain intact. Files hidden by the plugin are hidden only in the file explorer and remain available through links, search, the quick switcher, and other Obsidian features.
 
+> [!CAUTION]
+> This project is completely AI slop and only developed with my useage in mind. It's tested and I daily drive it, but I've never read the code and don't intend to.
+
 ## Features
 
 - Hide individual files and folders, with a temporary reveal control
