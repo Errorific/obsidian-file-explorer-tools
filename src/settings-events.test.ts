@@ -22,8 +22,9 @@ describe('applyRename', () => {
 		});
 	});
 
-	it('moves a prefix entry when an item moves between folders', () => {
+	it('moves a hidden prefix entry between folders without losing its position', () => {
 		const settings = loadSettings({
+			hiddenPaths: ['Projects/Current.md'],
 			folders: {
 				Projects: { orderedPrefix: ['Current.md', 'Later.md'] },
 				Archive: { orderedPrefix: ['Existing.md'] },
@@ -32,6 +33,7 @@ describe('applyRename', () => {
 
 		applyRename(settings, 'Projects/Current.md', 'Archive/Current.md');
 
+		expect(settings.hiddenPaths).toEqual(['Archive/Current.md']);
 		expect(settings.folders.Projects?.orderedPrefix).toEqual(['Later.md']);
 		expect(settings.folders.Archive?.orderedPrefix).toEqual([
 			'Existing.md',
