@@ -1,6 +1,6 @@
 {
 	"name": "file-explorer-tools",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"description": "Tools for hiding, sorting, and navigating items in Obsidian's file explorer.",
 	"main": "main.js",
 	"type": "module",
