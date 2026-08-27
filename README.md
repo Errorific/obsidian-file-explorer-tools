@@ -17,18 +17,26 @@ The plugin works directly with Obsidian's file explorer, so your existing layout
 
 ## Installation
 
-File Explorer Tools is currently installed from a GitHub release:
+Until the first release is published, install File Explorer Tools from source:
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the release.
-2. Create this folder inside your vault:
+1. Clone this repository.
+2. Install the pinned Node.js and npm versions, install dependencies, and build the plugin:
+
+   ```sh
+   mise install
+   npm ci
+   npm run build
+   ```
+
+3. Create this folder inside your vault:
 
    ```text
    <Vault>/.obsidian/plugins/file-explorer-tools/
    ```
 
-3. Copy the three downloaded files into that folder.
-4. Reload Obsidian.
-5. Open **Settings → Community plugins** and enable **File Explorer Tools**.
+4. Copy `main.js`, `manifest.json`, and `styles.css` from the repository into that folder.
+5. Reload Obsidian.
+6. Open **Settings → Community plugins** and enable **File Explorer Tools**.
 
 File Explorer Tools currently supports desktop Obsidian only.
 
@@ -118,7 +126,7 @@ Folder Notes is optional. Unsupported or unrecognized Folder Notes configuration
 
 File Explorer Tools integrates with parts of Obsidian's built-in file explorer that are not available through the public plugin API. The plugin checks the required capabilities at runtime and leaves Obsidian's native explorer behavior intact when an integration is unavailable.
 
-The current release has been manually verified with:
+The current version has been manually verified with:
 
 - Obsidian 1.13.7
 - Folder Notes 1.8.26
