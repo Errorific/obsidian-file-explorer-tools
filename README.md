@@ -20,9 +20,16 @@ The plugin works directly with Obsidian's file explorer, so your existing layout
 
 ## Installation
 
-Install File Explorer Tools from its [latest GitHub release](https://github.com/Errorific/obsidian-file-explorer-tools/releases/latest):
+The preferred installation method uses [BRAT](https://github.com/TfTHacker/obsidian42-brat):
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the release assets.
+1. Install and enable **BRAT** from **Settings → Community plugins**.
+2. Open **Settings → BRAT** and select **Add beta plugin**.
+3. Enter `https://github.com/Errorific/obsidian-file-explorer-tools` and add the plugin.
+4. Open **Settings → Community plugins** and enable **File Explorer Tools**.
+
+To install manually instead:
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest GitHub release](https://github.com/Errorific/obsidian-file-explorer-tools/releases/latest).
 2. Create this folder inside your vault:
 
    ```text
