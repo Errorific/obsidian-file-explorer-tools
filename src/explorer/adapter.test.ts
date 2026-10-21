@@ -443,14 +443,12 @@ describe('createExplorerAdapter', () => {
 		(view.fileItems.Projects as FakeItem & { selfEl: unknown }).selfEl = element;
 		const adapter = createExplorerAdapter(view);
 
-		expect(
-			adapter.setItemVisibility('Projects', {
-				hidden: true,
-				showHidden: true,
-				dimmed: true,
-				marked: true,
-			}),
-		).toBe(true);
+		adapter.setItemsVisibility(() => ({
+			hidden: true,
+			showHidden: true,
+			dimmed: true,
+			marked: true,
+		}));
 		expect(classes).toEqual(
 			new Set([
 				'file-explorer-tools-hidden-revealed',

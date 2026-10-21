@@ -66,7 +66,7 @@ export interface ExplorerAdapter {
 	getCompatibilityReport(): ExplorerCompatibilityReport;
 	getFocusedPath(): string | null;
 	getItems(): ExplorerItemSnapshot[];
-	setItemVisibility(path: string, visibility: ItemVisibility): boolean;
+	setItemsVisibility(visibilityFor: (path: string) => ItemVisibility): void;
 	getSortMode(): CoreSortMode | null;
 	installPinnedItems(options: PinnedItemOptions): (() => void) | null;
 	installSorting(getOptions: SortingOptionsProvider): (() => void) | null;

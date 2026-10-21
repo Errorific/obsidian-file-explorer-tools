@@ -482,24 +482,24 @@ export class ExplorerController {
 	private applyVisibility(attached: AttachedExplorer): void {
 		const settings = this.getSettings();
 		const hiddenPaths = settings.hiddenPaths;
-		for (const item of attached.adapter.getItems()) {
-			const hidden = isHidden(settings, item.path);
-			const visible =
+		attached.adapter.setItemsVisibility((path) => {
+			const hidden = isHidden(settings, path);
+			const revealed =
 				attached.state.showHidden ||
-				attached.state.temporaryVisiblePaths.has(item.path);
+				attached.state.temporaryVisiblePaths.has(path);
 			const hiddenAncestorIsVisible = hiddenPaths.some(
-				(path) =>
-					isPathOrDescendant(item.path, path) &&
+				(hiddenPath) =>
+					isPathOrDescendant(path, hiddenPath) &&
 					(attached.state.showHidden ||
-						attached.state.temporaryVisiblePaths.has(path)),
+						attached.state.temporaryVisiblePaths.has(hiddenPath)),
 			);
-			attached.adapter.setItemVisibility(item.path, {
+			return {
 				hidden,
-				showHidden: visible,
+				showHidden: revealed,
 				dimmed: hiddenAncestorIsVisible,
 				marked: hidden,
-			});
-		}
+			};
+		});
 	}
 
 	private pathsToReveal(file: TFile): string[] {

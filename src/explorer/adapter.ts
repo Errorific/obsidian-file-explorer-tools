@@ -239,37 +239,12 @@ class ObsidianExplorerAdapter implements ExplorerAdapter {
 		}));
 	}
 
-	setItemVisibility(path: string, visibility: ItemVisibility): boolean {
-		const item = this.findItem(path);
-		const element = readItemElement(item);
-		if (element === null) {
-			return false;
-		}
-
-		try {
-			if (visibility.hidden && !visibility.showHidden) {
-				element.classList.add('file-explorer-tools-hidden');
-			} else {
-				element.classList.remove('file-explorer-tools-hidden');
+	setItemsVisibility(visibilityFor: (path: string) => ItemVisibility): void {
+		for (const { path, value } of this.readItems() ?? []) {
+			const element = readItemElement(value);
+			if (element !== null) {
+				applyItemVisibility(element, visibilityFor(path));
 			}
-			element.classList.toggle(
-				'file-explorer-tools-hidden-revealed',
-				visibility.dimmed,
-			);
-			element.classList.toggle(
-				'file-explorer-tools-hidden-marked',
-				visibility.marked,
-			);
-			if (visibility.hidden) {
-				element.setAttribute('aria-hidden', String(!visibility.showHidden));
-				element.setAttribute('data-file-explorer-tools-hidden', 'true');
-			} else {
-				element.removeAttribute('aria-hidden');
-				element.removeAttribute('data-file-explorer-tools-hidden');
-			}
-			return true;
-		} catch {
-			return false;
 		}
 	}
 
@@ -926,14 +901,44 @@ class PinnedItemController {
 	}
 }
 
-function readItemElement(
-	item: InternalExplorerItem | null,
-): {
+interface ItemElement {
 	classList: DOMTokenList;
 	getBoundingClientRect?: () => DOMRect;
 	setAttribute(name: string, value: string): void;
 	removeAttribute(name: string): void;
-} | null {
+}
+
+function applyItemVisibility(
+	element: ItemElement,
+	visibility: ItemVisibility,
+): void {
+	try {
+		if (visibility.hidden && !visibility.showHidden) {
+			element.classList.add('file-explorer-tools-hidden');
+		} else {
+			element.classList.remove('file-explorer-tools-hidden');
+		}
+		element.classList.toggle(
+			'file-explorer-tools-hidden-revealed',
+			visibility.dimmed,
+		);
+		element.classList.toggle(
+			'file-explorer-tools-hidden-marked',
+			visibility.marked,
+		);
+		if (visibility.hidden) {
+			element.setAttribute('aria-hidden', String(!visibility.showHidden));
+			element.setAttribute('data-file-explorer-tools-hidden', 'true');
+		} else {
+			element.removeAttribute('aria-hidden');
+			element.removeAttribute('data-file-explorer-tools-hidden');
+		}
+	} catch {
+		// One malformed row must not stop visibility updates for the rest.
+	}
+}
+
+function readItemElement(item: InternalExplorerItem | null): ItemElement | null {
 	for (const candidate of [item?.el, item?.selfEl, item?.titleEl]) {
 		if (!isRecord(candidate) || !isRecord(candidate.classList)) {
 			continue;
@@ -948,12 +953,7 @@ function readItemElement(
 		) {
 			continue;
 		}
-		return candidate as {
-			classList: DOMTokenList;
-			getBoundingClientRect?: () => DOMRect;
-			setAttribute(name: string, value: string): void;
-			removeAttribute(name: string): void;
-		};
+		return candidate as unknown as ItemElement;
 	}
 	return null;
 }
