@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TFile } from 'obsidian';
 import type { FileExplorerToolsSettings } from '../settings';
 import { FakeVault } from '../testing/vault-fakes';
-import type { ExplorerAdapter, ToolbarAction } from './adapter-types';
+import type {
+	ExplorerAdapter,
+	ItemVisibility,
+	ToolbarAction,
+} from './adapter-types';
 import {
 	ExplorerController,
 	type ExplorerLeaf,
@@ -55,6 +59,14 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 	const refreshToolbarActions = vi.fn();
 	const scrollTo = vi.fn(() => true);
 	const select = vi.fn(() => true);
+	const itemVisibility = new Map<string, ItemVisibility>();
+	const setItemsVisibility: ExplorerAdapter['setItemsVisibility'] = vi.fn(
+		(visibilityFor: (path: string) => ItemVisibility) => {
+			for (const item of adapter.getItems()) {
+				itemVisibility.set(item.path, visibilityFor(item.path));
+			}
+		},
+	);
 	const adapter: ExplorerAdapter = {
 		addToolbarAction,
 		collapse,
@@ -62,7 +74,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		getCompatibilityReport,
 		getFocusedPath,
 		getItems: vi.fn(() => []),
-		setItemVisibility: vi.fn(() => true),
+		setItemsVisibility,
 		getSortMode,
 		installPinnedItems,
 		installSorting,
@@ -87,6 +99,7 @@ function createAdapter(overrides: Partial<ExplorerAdapter> = {}) {
 		installPinnedItems,
 		installSorting,
 		isItemVisible,
+		itemVisibility,
 		observeRenders,
 		refreshPinnedItems,
 		refreshToolbarActions,
@@ -500,8 +513,7 @@ describe('ExplorerController', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
 		const hiddenSettings = { ...settings, hiddenPaths: ['Private.md'] };
-		const setItemVisibility = vi.fn(() => true);
-		const { adapter, actions } = createAdapter({
+		const { adapter, actions, itemVisibility } = createAdapter({
 			getItems: vi.fn(() => [
 				{
 					path: 'Private.md',
@@ -510,7 +522,6 @@ describe('ExplorerController', () => {
 					selected: true,
 				},
 			]),
-			setItemVisibility,
 		});
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
@@ -525,7 +536,7 @@ describe('ExplorerController', () => {
 			.find((action) => action.title === 'Toggle hidden items')
 			?.callback();
 
-		expect(setItemVisibility).toHaveBeenLastCalledWith('Private.md', {
+		expect(itemVisibility.get('Private.md')).toEqual({
 			hidden: true,
 			showHidden: true,
 			dimmed: true,
@@ -541,8 +552,7 @@ describe('ExplorerController', () => {
 			...settings,
 			hiddenPaths: ['Projects', 'Projects/Active'],
 		};
-		const setItemVisibility = vi.fn(() => true);
-		const { adapter } = createAdapter({
+		const { adapter, itemVisibility } = createAdapter({
 			getItems: vi.fn(() => [
 				{
 					path: 'Projects',
@@ -563,7 +573,6 @@ describe('ExplorerController', () => {
 					selected: true,
 				},
 			]),
-			setItemVisibility,
 		});
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
@@ -575,13 +584,13 @@ describe('ExplorerController', () => {
 		controller.start();
 		triggerLayoutReady();
 
-		expect(setItemVisibility).toHaveBeenCalledWith('Projects', {
+		expect(itemVisibility.get('Projects')).toEqual({
 			hidden: true,
 			showHidden: true,
 			dimmed: true,
 			marked: true,
 		});
-		expect(setItemVisibility).toHaveBeenCalledWith('Projects/Active', {
+		expect(itemVisibility.get('Projects/Active')).toEqual({
 			hidden: true,
 			showHidden: true,
 			dimmed: true,
@@ -593,8 +602,7 @@ describe('ExplorerController', () => {
 		const leaf = { view: {} };
 		const { host, triggerLayoutReady } = createHost([leaf]);
 		const hiddenSettings = { ...settings, hiddenPaths: ['Private'] };
-		const setItemVisibility = vi.fn(() => true);
-		const { adapter, actions } = createAdapter({
+		const { adapter, actions, itemVisibility } = createAdapter({
 			getItems: vi.fn(() => [
 				{
 					path: 'Private',
@@ -609,7 +617,6 @@ describe('ExplorerController', () => {
 					selected: false,
 				},
 			]),
-			setItemVisibility,
 		});
 		const controller = new ExplorerController(host, {
 			createAdapter: () => adapter,
@@ -623,7 +630,7 @@ describe('ExplorerController', () => {
 			.find((action) => action.title === 'Toggle hidden items')
 			?.callback();
 
-		expect(setItemVisibility).toHaveBeenLastCalledWith('Private/Note.md', {
+		expect(itemVisibility.get('Private/Note.md')).toEqual({
 			hidden: false,
 			showHidden: true,
 			dimmed: true,
